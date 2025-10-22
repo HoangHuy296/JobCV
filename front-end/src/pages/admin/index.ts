@@ -1,0 +1,23 @@
+// Admin module exports
+export { default as Dashboard } from './Dashboard';
+export { default as AdminJobManagement } from './business/JobManagement';
+export { default as JobReviewManagement } from './business/JobReviewManagement';
+export { default as UnifiedJobManagement } from './business/UnifiedJobManagement';
+export { default as AdminCompanyManagement } from './business/CompanyManagement';
+export { default as CVManagement } from './business/CVManagement';
+export { default as IndustryManagement } from './business/IndustryManagement';
+export { default as RoleManagement } from './system/RoleManagement';
+export { default as UserManagement } from './system/UserManagement';
+export { default as SettingsManagement } from './system/SettingsManagement';
+export { default as MediaManagement } from './system/MediaManagement';
+export { default as NotificationManagement } from './system/NotificationManagement';
+
+// Export all admin components as a single module
+export * from './Dashboard';
+export * from './business/JobManagement';
+export * from './business/CompanyManagement';
+export * from './business/CVManagement';
+export * from './business/IndustryManagement';
+export * from './system/RoleManagement';
+export * from './system/UserManagement';
+export * from './system/SettingsManagement';

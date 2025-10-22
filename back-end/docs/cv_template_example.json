@@ -1,0 +1,59 @@
+{
+  "personalInfo": {
+    "fullName": "Nguyen Van A",
+    "email": "nguyenvana@email.com",
+    "phone": "0123456789",
+    "address": "123 Main Street, Hanoi",
+    "linkedin": "https://linkedin.com/in/nguyenvana",
+    "website": "https://nguyenvana.com"
+  },
+  "summary": "Experienced software developer with 5 years of experience in web development, specializing in JavaScript and React.",
+  "workExperience": [
+    {
+      "company": "Tech Company Ltd",
+      "position": "Senior Frontend Developer",
+      "startDate": "2020-01-01",
+      "endDate": "2023-12-31",
+      "description": "Developed and maintained web applications using React and Node.js",
+      "achievements": [
+        "Improved application performance by 40%",
+        "Led a team of 3 developers"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "institution": "Hanoi University of Science and Technology",
+      "degree": "Bachelor of Computer Science",
+      "startDate": "2015-09-01",
+      "endDate": "2019-06-30"
+    }
+  ],
+  "skills": [
+    {
+      "category": "Programming Languages",
+      "items": ["JavaScript", "TypeScript", "Python"]
+    },
+    {
+      "category": "Frameworks & Libraries",
+      "items": ["React", "Node.js", "Express"]
+    }
+  ],
+  "languages": [
+    {
+      "language": "Vietnamese",
+      "proficiency": "Native"
+    },
+    {
+      "language": "English",
+      "proficiency": "Fluent"
+    }
+  ],
+  "certifications": [
+    {
+      "name": "AWS Certified Developer",
+      "issuer": "Amazon Web Services",
+      "date": "2022-05-15"
+    }
+  ]
+}

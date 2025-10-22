@@ -1,0 +1,418 @@
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getAllCompanies, createCompany, updateCompany, deleteCompany, type Company, type CreateCompanyData } from '../../../api/companyService';
+import { uploadMedia } from '../../../api/mediaService';
+import { toast } from 'react-toastify';
+import { DataManagement } from '../../../components';
+import { useIndustryContext } from '../../../contexts/IndustryContext';
+import SelectWithSearch from '../../../components/common/SelectWithSearch';
+
+const CompanyManagementRefactored: React.FC = () => {
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { industries } = useIndustryContext();
+  const hasFetchedData = useRef(false);
+  const navigate = useNavigate();
+  
+  // Pagination and filtering state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [industryFilter, setIndustryFilter] = useState('');
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 0
+  });
+
+  // Fetch companies with pagination and filtering
+  const fetchCompanies = useCallback(async (page: number = 1, reset: boolean = false) => {
+    try {
+      setLoading(true);
+      
+      // Reset filters and pagination if requested
+      if (reset) {
+        setSearchTerm('');
+        setIndustryFilter('');
+        page = 1;
+      }     
+      
+      const response = await getAllCompanies(
+        page, 
+        pagination.limit, 
+        searchTerm, 
+        industryFilter
+      );
+      
+      setCompanies(response.companies || []);
+      setPagination(response.pagination);
+      setCurrentPage(page);
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.limit, searchTerm, industryFilter]);
+
+
+
+  // Load data on component mount
+  useEffect(() => {
+    // Prevent duplicate calls in development due to React Strict Mode
+    if (hasFetchedData.current) return;
+    hasFetchedData.current = true;
+    
+    // Reset filters and search terms on component mount
+    setSearchTerm('');
+    setIndustryFilter('');
+    fetchCompanies(1);
+  }, [fetchCompanies]);
+
+  // Industry options for SelectWithSearch
+  const industryOptions = useMemo(() => [
+    { value: '', label: 'Tất cả ngành' },
+    ...industries.map(industry => ({
+      value: industry.id.toString(),
+      label: industry.name
+    }))
+  ], [industries]);
+
+  // Handle industry filter change
+  const handleIndustryFilterChange = useCallback((selectedValues: any[]) => {
+    setIndustryFilter(selectedValues.length > 0 ? selectedValues[0] : '');
+  }, []);
+
+  // Memoized additional filters
+  const additionalFilters = useMemo(() => (
+    <div className="w-full md:w-64">
+      <label htmlFor="industryFilter" className="block text-sm font-medium text-gray-700 mb-1">
+        Ngành nghề
+      </label>
+      <SelectWithSearch
+        options={industryOptions}
+        selectedValues={[industryFilter]}
+        onChange={handleIndustryFilterChange}
+        placeholder="Chọn ngành nghề"
+        multiple={false}
+        clearable={true}
+      />
+    </div>
+  ), [industryFilter, industryOptions, handleIndustryFilterChange]);
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    if (searchTerm !== '') {
+      setCurrentPage(1);
+    }
+  }, [searchTerm]);
+
+  // Memoized pagination data
+  const paginationData = useMemo(() => {
+    return pagination.totalPages > 1
+      ? {
+          currentPage,
+          totalPages: pagination.totalPages,
+          totalItems: pagination.total,
+          itemsPerPage: pagination.limit,
+          onPageChange: fetchCompanies
+        }
+      : undefined;
+  }, [currentPage, pagination, fetchCompanies]);
+
+  // Memoized filter data
+  const filterData = useMemo(() => ({
+    searchTerm,
+    onSearchChange: setSearchTerm,
+    additionalFilters,
+    onFilter: () => fetchCompanies(currentPage, false)
+  }), [searchTerm, additionalFilters, currentPage, fetchCompanies]);
+
+  const handleCreate = useCallback(async (values: Record<string, any>): Promise<Company | null> => {
+    try {
+      // Handle logo upload if a file is provided
+      let logoId: number | undefined;
+      if (values.logo && values.logo instanceof File) {
+        try {
+          const mediaResponse = await uploadMedia(values.logo);
+          logoId = mediaResponse.id;
+        } catch (uploadError) {
+          console.error('Error uploading logo:', uploadError);
+        }
+      } else if (typeof values.logo === 'number') {
+        logoId = values.logo;
+      }
+      
+      const companyData: CreateCompanyData = {
+        name: values.name,
+        description: values.description,
+        industries: Array.isArray(values.industries) ? values.industries.map(Number) : [],
+        website: values.website,
+        location: values.location,
+        logo_id: logoId,
+        employees: values.employees,
+        facebook: values.facebook,
+        youtube: values.youtube,
+        linkedin: values.linkedin,
+        twitter: values.twitter,
+        instagram: values.instagram,
+      };
+      
+      const createdCompany = await createCompany(companyData);
+
+      if (createdCompany) {
+        toast.success('Tạo công ty mới thành công');
+        // Return the created company for edit mode
+        return createdCompany;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error creating company:', error);
+      return null;
+    }
+  }, [fetchCompanies, currentPage]);
+
+  const handleEdit = useCallback(async (updatedCompany: Company) => {
+    try {
+      // The DataManagement component merges the original record with form values
+      // For editing, we need to handle the industries field from form values
+      const industriesData = Array.isArray((updatedCompany as any).industries) 
+        ? (updatedCompany as any).industries.map(Number) 
+        : updatedCompany.industries || [];
+      
+      // Handle logo upload if a file is provided
+      let logoId: number | undefined = updatedCompany.logo?.id ? updatedCompany.logo.id : undefined;
+      if ((updatedCompany as any).logo && (updatedCompany as any).logo instanceof File) {
+        try {
+          const mediaResponse = await uploadMedia((updatedCompany as any).logo);
+          logoId = mediaResponse.id;
+        } catch (uploadError) {
+          console.error('Error uploading logo:', uploadError);
+        }
+      } else if (typeof (updatedCompany as any).logo === 'number') {
+        logoId = (updatedCompany as any).logo;
+      }
+      
+      // Update the company with the new industries array
+      const resp = await updateCompany(updatedCompany.id, {
+        name: updatedCompany.name,
+        description: updatedCompany.description,
+        industries: industriesData,
+        website: updatedCompany.website,
+        location: updatedCompany.location,
+        logo_id: logoId,
+        employees: updatedCompany.employees,
+        facebook: updatedCompany.facebook,
+        youtube: updatedCompany.youtube,
+        linkedin: updatedCompany.linkedin,
+        twitter: updatedCompany.twitter,
+        instagram: updatedCompany.instagram,
+      });
+      
+      if (resp) {
+        toast.success('Cập nhật công ty thành công');
+        fetchCompanies(currentPage);
+      }
+    } catch (error) {
+      console.error('Error updating company:', error);
+    }
+  }, [fetchCompanies, currentPage]);
+
+  // Function to navigate to the public company detail page
+  const handleViewLive = useCallback((company: Company) => {
+    // The company ID is encoded in base64 in the URL as seen in CompanyDetail.tsx
+    const encodedId = btoa(company.id.toString());
+    navigate(`/cong-ty/${encodedId}`);
+  }, [navigate]);
+
+  const handleDelete = async (record: Company) => {
+    try {
+      const resp = await deleteCompany(record.id);
+      if (resp) {
+        toast.success('Xóa công ty thành công');
+        fetchCompanies(currentPage);
+      }
+    } catch (error) {
+      console.error('Error deleting company:', error);
+    }
+  };
+
+  // Memoized columns to prevent recreation on each render
+  const columns = useMemo(() => [
+    { 
+      key: 'logo_url' as keyof Company, 
+      title: 'Logo',
+      render: (_value: any, record: Company) => record?.logo?.url ? (
+        <img src={record.logo.url} alt={record.name} className="h-10 w-10 object-contain" />
+      ) : (
+        <div className="h-10 w-10 bg-gray-200 rounded flex items-center justify-center">
+          <span className="text-gray-500 text-xs">Không có</span>
+        </div>
+      )
+    },
+    { key: 'name' as keyof Company, title: 'Tên công ty' },
+    { 
+      key: 'industries' as keyof Company, 
+      title: 'Ngành nghề',
+      render: (_value: any, record: Company) => {
+        if (Array.isArray(record.industries) && record.industries.length > 0) {
+          // Map industry IDs to industry names
+          const industryNames = record.industries.map(industryId => {
+            const industry = industries.find(i => i.id === industryId);
+            return industry ? industry.name : `ID: ${industryId}`;
+          });
+          
+          // Show first 2 industries and "..." if there are more
+          if (industryNames.length > 2) {
+            const displayedIndustries = industryNames.slice(0, 2).join(', ');
+            const remainingIndustries = industryNames.slice(2).join(', ');
+            return (
+              <span title={remainingIndustries}>
+                {displayedIndustries} và {industryNames.length - 2} ngành khác...
+              </span>
+            );
+          }
+          return industryNames.join(', ');
+        }
+        return 'Chưa có';
+      }
+    },
+    { 
+      key: 'website' as keyof Company, 
+      title: 'Website',
+      render: (value: any) => value ? (
+        <a href={value} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-900">
+          {value}
+        </a>
+      ) : 'Chưa có'
+    },
+    { 
+      key: 'location' as keyof Company, 
+      title: 'Vị trí',
+      render: (value: any) => {
+        if (Array.isArray(value) && value.length > 0) {
+          // Show only the first location
+          return value[0];
+        } else if (typeof value === 'string') {
+          // If it's a string, show it as is
+          return value;
+        }
+        return 'Chưa có';
+      }
+    },
+    { 
+      key: 'employees' as keyof Company, 
+      title: 'Nhân viên',
+      render: (value: any) => value || 'Chưa có'
+    },
+    { 
+      key: 'created_at' as keyof Company, 
+      title: 'Ngày tạo',
+      render: (value: any) => new Date(value).toLocaleDateString('vi-VN')
+    }
+  ], [industries]);
+
+  // Memoized form fields to prevent recreation on each render
+  const formFields = useMemo(() => [
+    { 
+      name: 'logo', 
+      label: 'Logo công ty', 
+      type: 'image' as const,
+    },
+    { 
+      name: 'name', 
+      label: 'Tên công ty', 
+      type: 'textarea' as const, 
+      required: true, 
+      placeholder: 'Nhập tên công ty' 
+    },
+    { 
+      name: 'description', 
+      label: 'Mô tả', 
+      type: 'editor' as const, 
+      placeholder: 'Nhập mô tả công ty' 
+    },
+    { 
+      name: 'industries', 
+      label: 'Ngành nghề', 
+      type: 'industry' as const, 
+      required: true
+    },
+    { 
+      name: 'website', 
+      label: 'Website', 
+      type: 'text' as const, 
+      placeholder: 'Nhập website công ty' 
+    },
+    { 
+      name: 'employees', 
+      label: 'Số lượng nhân viên', 
+      type: 'text' as const, 
+      placeholder: 'Nhập số lượng nhân viên (ví dụ: 50-100)' 
+    },
+    { 
+      name: 'location', 
+      label: 'Vị trí', 
+      type: 'location' as const, 
+      placeholder: 'Chọn vị trí công ty',
+    },
+    { 
+      name: 'facebook', 
+      label: 'Facebook', 
+      type: 'text' as const, 
+      placeholder: 'Nhập URL Facebook công ty' 
+    },
+    { 
+      name: 'youtube', 
+      label: 'YouTube', 
+      type: 'text' as const, 
+      placeholder: 'Nhập URL YouTube công ty' 
+    },
+    { 
+      name: 'linkedin', 
+      label: 'LinkedIn', 
+      type: 'text' as const, 
+      placeholder: 'Nhập URL LinkedIn công ty' 
+    },
+    { 
+      name: 'twitter', 
+      label: 'Twitter', 
+      type: 'text' as const, 
+      placeholder: 'Nhập URL Twitter công ty' 
+    },
+    { 
+      name: 'instagram', 
+      label: 'Instagram', 
+      type: 'text' as const, 
+      placeholder: 'Nhập URL Instagram công ty' 
+    },
+  ], [companies]);
+
+  return (
+    <DataManagement<Company>
+      title="Quản lý công ty"
+      data={companies}
+      columns={columns}
+      formFields={formFields}
+      loading={loading}
+      onCreate={handleCreate}
+      onEdit={handleEdit}
+      onDelete={handleDelete}
+      onRefresh={() => fetchCompanies(1, true)}
+      pagination={paginationData}
+      filters={filterData}
+      action={{
+        additionalActions: (company: Company) => [
+          {
+            label: 'Xem trực tiếp',
+            icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+            onClick: () => handleViewLive(company),
+            className: 'text-blue-600 hover:text-blue-800 cursor-pointer',
+            type: 'default'
+          }
+        ]
+      }}
+    />
+  );
+};
+
+export default CompanyManagementRefactored;
