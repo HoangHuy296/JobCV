@@ -9,15 +9,11 @@ const getUserCVs = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search || '';
-    const isTemplate = req.query.is_template;
     const offset = (page - 1) * limit;
     
     const filters = { user_id: userId };
     if (search) {
       filters.search = search;
-    }
-    if (isTemplate !== undefined) {
-      filters.is_template = isTemplate === 'true' || isTemplate === true;
     }
     
     const cvs = await CV.findWithPagination(filters, limit, offset);
@@ -41,35 +37,49 @@ const getUserCVs = async (req, res) => {
   }
 };
 
-// Upload a new CV
+// Upload a new CV file (PDF or image)
 const uploadCV = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { title, content } = req.body;
+    const { title } = req.body;
     
     if (!title) {
       return res.status(400).json({ result: null, message: 'Tiêu đề là bắt buộc' });
     }
     
-    // If content is provided, save as JSON template
-    if (content) {
-      const cvData = {
-        user_id: userId,
-        title,
-        content: JSON.parse(content), // Parse the JSON string
-        is_template: req.body.is_template === 'true' || req.body.is_template === true
-      };
-      
-      const newCV = await CV.createCV(cvData);
-      
-      return res.status(201).json({
-        result: { cv: newCV }, message: null
-      });
-    }
-    
-    // Otherwise, handle file upload as before
     if (!req.file) {
       return res.status(400).json({ result: null, message: 'Chưa có tệp nào được tải lên' });
+    }
+    
+    // Validate file type (PDF, Word documents, and images)
+    const allowedMimeTypes = [
+      // PDF
+      'application/pdf',
+      // Microsoft Word
+      'application/msword', // .doc
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+      // Images
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/svg+xml', // .svg
+      'image/heic', // iPhone photos
+      'image/heif'
+    ];
+    
+    if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      // Delete uploaded file if invalid
+      try {
+        await fs.unlink(req.file.path);
+      } catch (err) {
+        console.error('Error deleting invalid file:', err);
+      }
+      return res.status(400).json({ 
+        result: null, 
+        message: 'Chỉ chấp nhận file PDF, Word (DOC/DOCX) hoặc ảnh (JPG, PNG, GIF, WEBP, SVG, HEIC)' 
+      });
     }
     
     const cvData = {
@@ -81,18 +91,26 @@ const uploadCV = async (req, res) => {
       mime_type: req.file.mimetype
     };
     
-    const newCV = await CV.createCV(cvData);
+    const newCV = await CV.create(cvData);
     
     res.status(201).json({
       result: { cv: { ...newCV, file_path: undefined } }, message: null
     });
   } catch (error) {
     console.error('Error uploading CV:', error);
+    // Clean up uploaded file on error
+    if (req.file && req.file.path) {
+      try {
+        await fs.unlink(req.file.path);
+      } catch (err) {
+        console.error('Error deleting file after error:', err);
+      }
+    }
     res.status(500).json({ result: null, message: 'Tải lên CV thất bại' });
   }
 };
 
-// Download a CV
+// Download a CV file
 const downloadCV = async (req, res) => {
   try {
     const { id } = req.params;
@@ -108,16 +126,6 @@ const downloadCV = async (req, res) => {
       return res.status(404).json({ result: null, message: 'Không tìm thấy CV' });
     }
     
-    // If CV has JSON content, return it directly
-    if (cv.content) {
-      res.setHeader('Content-Type', 'application/json');
-      return res.json({
-        title: cv.title,
-        content: cv.content
-      });
-    }
-    
-    // Otherwise, handle file download as before
     if (!cv.file_path) {
       return res.status(404).json({ result: null, message: 'Không tìm thấy tệp CV' });
     }
@@ -139,7 +147,9 @@ const downloadCV = async (req, res) => {
     
     fileStream.on('error', (err) => {
       console.error('Error streaming file:', err);
-      res.status(500).json({ result: null, message: 'Tải xuống CV thất bại' });
+      if (!res.headersSent) {
+        res.status(500).json({ result: null, message: 'Tải xuống CV thất bại' });
+      }
     });
   } catch (error) {
     console.error('Error downloading CV:', error);
@@ -147,7 +157,7 @@ const downloadCV = async (req, res) => {
   }
 };
 
-// Delete a CV
+// Delete a CV file
 const deleteCV = async (req, res) => {
   try {
     const { id } = req.params;
@@ -170,7 +180,7 @@ const deleteCV = async (req, res) => {
     }
     
     // Soft delete the CV record
-    await CV.deleteCV(id);
+    await CV.delete(id);
     
     res.json({ result: true, message: null });
   } catch (error) {
@@ -179,66 +189,9 @@ const deleteCV = async (req, res) => {
   }
 };
 
-// Get all public templates
-const getPublicTemplates = async (req, res) => {
-  try {
-    const templates = await CV.getPublicTemplates();
-    
-    res.json({
-      result: { templates }, message: null
-    });
-  } catch (error) {
-    console.error('Error fetching templates:', error);
-    res.status(500).json({ result: null, message: 'Lấy danh sách mẫu thất bại' });
-  }
-};
-
-// Get a specific template
-const getTemplateById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const template = await CV.getTemplateById(id);
-    
-    if (!template) {
-      return res.status(404).json({ result: null, message: 'Không tìm thấy mẫu' });
-    }
-    
-    res.json({
-      result: { template }, message: null
-    });
-  } catch (error) {
-    console.error('Error fetching template:', error);
-    res.status(500).json({ result: null, message: 'Lấy thông tin mẫu thất bại' });
-  }
-};
-
-// Create a template from an existing CV
-const createTemplateFromCV = async (req, res) => {
-  try {
-    const { cvId, title } = req.body;
-    const userId = req.user.id;
-    
-    if (!title) {
-      return res.status(400).json({ result: null, message: 'Tiêu đề là bắt buộc' });
-    }
-    
-    const result = await CV.createTemplateFromCV(cvId, userId, title);
-    
-    res.status(201).json({
-      result: { templateId: result.insertId }, message: null
-    });
-  } catch (error) {
-    console.error('Error creating template:', error);
-    res.status(500).json({ result: null, message: 'Tạo mẫu thất bại' });
-  }
-};
-
 module.exports = {
   getUserCVs,
   uploadCV,
   downloadCV,
-  deleteCV,
-  getPublicTemplates,
-  getTemplateById,
-  createTemplateFromCV
+  deleteCV
 };

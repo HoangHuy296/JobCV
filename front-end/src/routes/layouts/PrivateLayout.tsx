@@ -97,8 +97,11 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
         default:
           items = [
             { name: 'Bảng điều khiển', path: '/bang-dieu-khien', category: 'dashboard' },
+            { name: 'Công ty', path: '/cong-ty', category: 'company' },
+            { name: 'Tin tuyển dụng', path: '/viec-lam', category: 'job' },
             { name: 'Công việc đã thích', path: '/cong-viec-da-thich', category: 'user' },
             { name: 'Công ty theo dõi', path: '/cong-ty-theo-doi', category: 'user' },
+            { name: 'Quản lý CV', path: '/quan-ly-cv', category: 'user' },
           ];
       }
     }
@@ -243,7 +246,7 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
       ? '/admin/bang-dieu-khien' 
       : user?.role === 'recruiter' 
         ? '/nha-tuyen-dung/bang-dieu-khien' 
-        : '/bang-dieu-khien';
+        : '/';
     navigate(path);
   }, [user, navigate]);
 
@@ -299,21 +302,7 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
             </div>
 
             {/* Desktop Navigation Links */}
-            <div className="hidden md:flex items-center space-x-1 lg:space-x-2">
-              {/* Public Links - Always visible */}
-              <button
-                onClick={() => navigate('/viec-lam')}
-                className={`cursor-pointer px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${location.pathname === '/viec-lam' ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
-              >
-                Việc làm
-              </button>
-              <button
-                onClick={() => navigate('/cong-ty')}
-                className={`cursor-pointer px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${location.pathname === '/cong-ty' ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
-              >
-                Công ty
-              </button>
-              
+            <div className="hidden md:flex items-center space-x-1 lg:space-x-2">              
               {/* Role-based Navigation */}
               {Object.entries(groupedNavItems).map(([category, items]) => (
                 items.length === 1 ? (

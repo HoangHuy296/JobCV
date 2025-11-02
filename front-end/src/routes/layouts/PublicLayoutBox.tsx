@@ -1,12 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { PropsWithChildren } from 'react';
+import { useUser } from '../../contexts/UserContext';
+import NotificationBell from '../../components/common/NotificationBell';
+import SlideOver from '../../components/common/SlideOver';
+import { userService } from '../../api/userService';
+import { toast } from 'react-toastify';
 
 const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout } = useUser();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [isProfileSlideOverOpen, setIsProfileSlideOverOpen] = useState(false);
+  const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
   
   // Handle navigation and close mobile menu
   const handleNavigate = (path: string) => {
@@ -18,6 +28,20 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
   const isActive = (path: string) => {
     return location.pathname === path;
   };
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setIsProfileDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Add scroll effect for header
   useEffect(() => {
@@ -34,6 +58,85 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
+
+  // Handle logout
+  const handleLogout = () => {
+    logout();
+    toast.success('Đăng xuất thành công');
+    navigate('/');
+  };
+
+  // Profile form fields
+  const profileFields = [
+    {
+      name: 'name',
+      label: 'Họ và tên',
+      type: 'text' as const,
+      required: true,
+      placeholder: 'Nhập họ và tên'
+    },
+    {
+      name: 'email',
+      label: 'Email',
+      type: 'email' as const,
+      required: true,
+      placeholder: 'Nhập email'
+    },
+    {
+      name: 'newPassword',
+      label: 'Mật khẩu mới',
+      type: 'password' as const,
+      placeholder: 'Nhập mật khẩu mới'
+    },
+    {
+      name: 'confirmPassword',
+      label: 'Xác nhận mật khẩu mới',
+      type: 'password' as const,
+      placeholder: 'Nhập lại mật khẩu mới'
+    }
+  ];
+
+  // Handle profile click
+  const handleProfileClick = () => {
+    setIsProfileSlideOverOpen(true);
+    setIsProfileDropdownOpen(false);
+  };
+
+  // Handle profile update
+  const handleProfileUpdate = async (values: Record<string, any>) => {
+    setIsProfileSubmitting(true);
+    const { newPassword, confirmPassword, ...profileData } = values;
+    
+    if (newPassword || confirmPassword) {
+      if (!newPassword) {
+        toast.error('Vui lòng nhập mật khẩu mới');
+        setIsProfileSubmitting(false);
+        return;
+      }
+      
+      if (newPassword !== confirmPassword) {
+        toast.error('Mật khẩu xác nhận không khớp');
+        setIsProfileSubmitting(false);
+        return;
+      }
+      
+      profileData.password = newPassword;
+    }
+    
+    try {
+      if (user) {
+        const resp = await userService.updateUser(user.id, profileData);
+        if (resp) {
+          toast.success('Cập nhật hồ sơ thành công');
+        }
+      }      
+    } catch (error) {
+      console.error('Error updating profile:', error);
+    } finally {
+      setIsProfileSubmitting(false);
+      setIsProfileSlideOverOpen(false);
+    }
+  };
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -72,16 +175,16 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-4">
               <button 
-                onClick={() => handleNavigate('/')} 
+                onClick={() => handleNavigate('/bang-dieu-khien')} 
                 className={`cursor-pointer px-3 py-2 rounded-md text-sm font-medium transition-colors relative ${
-                  isActive('/') 
+                  isActive('/bang-dieu-khien') 
                     ? 'text-blue-600' 
                     : 'text-gray-700 hover:text-blue-600'
                 }`}
-                aria-current={isActive('/') ? 'page' : undefined}
+                aria-current={isActive('/bang-dieu-khien') ? 'page' : undefined}
               >
-                Trang chủ
-                {isActive('/') && (
+                Bảng điều khiển
+                {isActive('/bang-dieu-khien') && (
                   <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-full"></span>
                 )}
               </button>
@@ -116,24 +219,71 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
 
               <div className="h-6 w-px bg-gray-200 mx-2"></div>
 
-              <button 
-                onClick={() => handleNavigate('/dang-ky')} 
-                className="cursor-pointer text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                Đăng ký
-              </button>
-              <button 
-                onClick={() => handleNavigate('/dang-nhap')} 
-                className="cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
-              >
-                Đăng nhập
-              </button>
-              <button 
-                onClick={() => handleNavigate('/dang-nhap-nha-tuyen-dung')} 
-                className="cursor-pointer text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                Đăng tuyển & tìm hồ sơ
-              </button>
+              {user ? (
+                // Show user profile when logged in
+                <div className="flex items-center gap-3">
+                  <NotificationBell />
+                  
+                  <div className="relative" ref={profileDropdownRef}>
+                    <button
+                      onClick={() => setIsProfileDropdownOpen(prev => !prev)}
+                      className="cursor-pointer flex items-center text-sm"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
+                        {user?.name?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                      <span className="ml-2 text-sm font-medium text-gray-700">
+                        {user?.name}
+                      </span>
+                      <svg className={`ml-1 w-4 h-4 transition-transform duration-300 ease-in-out ${isProfileDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                      </svg>
+                    </button>
+
+                    {/* Dropdown menu */}
+                    <div className={`origin-top-right absolute right-0 mt-2 w-48 rounded-lg shadow-xl bg-white z-50 transition-all duration-300 ease-in-out ${isProfileDropdownOpen ? 'opacity-100 visible scale-100 translate-y-0' : 'opacity-0 invisible scale-95 -translate-y-2'}`}>
+                      <div className="py-2" role="none">
+                        <button
+                          onClick={handleProfileClick}
+                          className="block w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 cursor-pointer transition-all duration-200"
+                          role="menuitem"
+                        >
+                          Hồ sơ cá nhân
+                        </button>
+                        <button
+                          onClick={handleLogout}
+                          className="block w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 cursor-pointer transition-all duration-200"
+                          role="menuitem"
+                        >
+                          Đăng xuất
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // Show login/register buttons when not logged in
+                <>
+                  <button 
+                    onClick={() => handleNavigate('/dang-ky')} 
+                    className="cursor-pointer text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  >
+                    Đăng ký
+                  </button>
+                  <button 
+                    onClick={() => handleNavigate('/dang-nhap')} 
+                    className="cursor-pointer bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
+                  >
+                    Đăng nhập
+                  </button>
+                  <button 
+                    onClick={() => handleNavigate('/dang-nhap-nha-tuyen-dung')} 
+                    className="cursor-pointer text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  >
+                    Đăng tuyển & tìm hồ sơ
+                  </button>
+                </>
+              )}
             </nav>
 
             {/* Mobile Menu Button */}
@@ -187,19 +337,61 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
                 >
                   Công ty
                 </button>
+                <button 
+                  onClick={() => handleNavigate('/viec-lam')} 
+                  className={`px-4 py-3 rounded-md text-sm font-medium text-left transition-colors ${
+                    isActive('/viec-lam') 
+                      ? 'bg-blue-50 text-blue-600' 
+                      : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+                  }`}
+                  aria-current={isActive('/viec-lam') ? 'page' : undefined}
+                >
+                  Tin tuyển dụng
+                </button>
                 <div className="h-px bg-gray-200 my-2"></div>
-                <button 
-                  onClick={() => handleNavigate('/dang-nhap')} 
-                  className="text-gray-700 hover:text-blue-600 px-4 py-3 rounded-md text-sm font-medium text-left transition-colors hover:bg-gray-50"
-                >
-                  Đăng nhập
-                </button>
-                <button 
-                  onClick={() => handleNavigate('/dang-ky')} 
-                  className="bg-blue-600 text-white px-4 py-3 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm text-left"
-                >
-                  Đăng ký
-                </button>
+                
+                {user ? (
+                  // Show user menu when logged in
+                  <>
+                    <div className="px-4 py-2 text-sm text-gray-500">
+                      Xin chào, {user.name}
+                    </div>
+                    <button 
+                      onClick={() => {
+                        handleProfileClick();
+                        setIsMobileMenuOpen(false);
+                      }} 
+                      className="text-gray-700 hover:text-blue-600 px-4 py-3 rounded-md text-sm font-medium text-left transition-colors hover:bg-gray-50"
+                    >
+                      Hồ sơ cá nhân
+                    </button>
+                    <button 
+                      onClick={() => {
+                        handleLogout();
+                        setIsMobileMenuOpen(false);
+                      }} 
+                      className="text-gray-700 hover:text-blue-600 px-4 py-3 rounded-md text-sm font-medium text-left transition-colors hover:bg-gray-50"
+                    >
+                      Đăng xuất
+                    </button>
+                  </>
+                ) : (
+                  // Show login/register when not logged in
+                  <>
+                    <button 
+                      onClick={() => handleNavigate('/dang-nhap')} 
+                      className="text-gray-700 hover:text-blue-600 px-4 py-3 rounded-md text-sm font-medium text-left transition-colors hover:bg-gray-50"
+                    >
+                      Đăng nhập
+                    </button>
+                    <button 
+                      onClick={() => handleNavigate('/dang-ky')} 
+                      className="bg-blue-600 text-white px-4 py-3 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm text-left"
+                    >
+                      Đăng ký
+                    </button>
+                  </>
+                )}
               </nav>
             </div>
           )}
@@ -310,6 +502,22 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
           </div>
         </div>
       </footer>
+      
+      {/* Profile SlideOver */}
+      {isProfileSlideOverOpen && 
+        (<SlideOver
+          title="Hồ sơ cá nhân"
+          isOpen={isProfileSlideOverOpen}
+          onClose={() => setIsProfileSlideOverOpen(false)}
+          onSubmit={handleProfileUpdate}
+          fields={profileFields}
+          initialValues={{
+            name: user?.name || '',
+            email: user?.email || ''
+          }}
+          isSubmitting={isProfileSubmitting}
+        />)
+      }
     </div>
   );
 };

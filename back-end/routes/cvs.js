@@ -1,7 +1,37 @@
 const express = require('express');
 const router = express.Router();
-const { getUserCVs, downloadCV, deleteCV, getPublicTemplates, getTemplateById, createTemplateFromCV } = require('../controllers/CVController');
+const multer = require('multer');
+const path = require('path');
+const { getUserCVs, uploadCV, downloadCV, deleteCV } = require('../controllers/CVController');
 const authenticate = require('../middleware/auth');
+
+// Configure multer for CV file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/cvs/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'cv-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    // Allow PDF, Word documents, and common image formats
+    const allowedTypes = /pdf|doc|docx|jpeg|jpg|png|gif|webp|svg|heic|heif/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Chễ chấp nhận file PDF, Word (DOC/DOCX) hoặc ảnh (JPG, PNG, GIF, WEBP, SVG, HEIC)'));
+    }
+  }
+});
 
 /**
  * @swagger
@@ -18,20 +48,49 @@ const authenticate = require('../middleware/auth');
  *     tags: [CVs]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: List of user's CVs
+ *         description: List of user's CVs with pagination
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 result:
+ *                   type: object
+ *                   properties:
+ *                     cvs:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/CV'
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         page:
+ *                           type: integer
+ *                         limit:
+ *                           type: integer
+ *                         total:
+ *                           type: integer
+ *                         totalPages:
+ *                           type: integer
  *                 message:
  *                   type: string
- *                 cvs:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/CV'
  *       401:
  *         description: Unauthorized
  *       500:
@@ -41,9 +100,58 @@ router.get('/', authenticate, getUserCVs);
 
 /**
  * @swagger
+ * /api/cvs:
+ *   post:
+ *     summary: Upload a new CV file
+ *     tags: [CVs]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: CV title
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: CV file (PDF, Word document, or image)
+ *             required:
+ *               - title
+ *               - file
+ *     responses:
+ *       201:
+ *         description: CV uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 result:
+ *                   type: object
+ *                   properties:
+ *                     cv:
+ *                       $ref: '#/components/schemas/CV'
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Bad request - missing title or file
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
+ */
+router.post('/', authenticate, upload.single('file'), uploadCV);
+
+/**
+ * @swagger
  * /api/cvs/{id}:
  *   get:
- *     summary: Download a CV
+ *     summary: Download a CV file
  *     tags: [CVs]
  *     security:
  *       - bearerAuth: []
@@ -56,7 +164,7 @@ router.get('/', authenticate, getUserCVs);
  *         description: CV ID
  *     responses:
  *       200:
- *         description: CV file or JSON content
+ *         description: CV file
  *         content:
  *           application/pdf:
  *             schema:
@@ -70,14 +178,18 @@ router.get('/', authenticate, getUserCVs);
  *             schema:
  *               type: string
  *               format: binary
- *           application/json:
+ *           image/jpeg:
  *             schema:
- *               type: object
- *               properties:
- *                 title:
- *                   type: string
- *                 content:
- *                   type: object
+ *               type: string
+ *               format: binary
+ *           image/png:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *           image/webp:
+ *             schema:
+ *               type: string
+ *               format: binary
  *       401:
  *         description: Unauthorized
  *       404:
@@ -121,114 +233,5 @@ router.get('/:id', authenticate, downloadCV);
  */
 router.delete('/:id', authenticate, deleteCV);
 
-/**
- * @swagger
- * /api/cvs/templates:
- *   get:
- *     summary: Get all public CV templates
- *     tags: [CVs]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of public CV templates
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 templates:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/CV'
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Server error
- */
-router.get('/templates', authenticate, getPublicTemplates);
-
-/**
- * @swagger
- * /api/cvs/templates/{id}:
- *   get:
- *     summary: Get a specific CV template
- *     tags: [CVs]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Template ID
- *     responses:
- *       200:
- *         description: CV template
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 template:
- *                   $ref: '#/components/schemas/CV'
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Template not found
- *       500:
- *         description: Server error
- */
-router.get('/templates/:id', authenticate, getTemplateById);
-
-/**
- * @swagger
- * /api/cvs/create-template:
- *   post:
- *     summary: Create a template from an existing CV
- *     tags: [CVs]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               cvId:
- *                 type: integer
- *                 description: ID of the CV to create template from
- *               title:
- *                 type: string
- *                 description: Title for the new template
- *             required:
- *               - cvId
- *               - title
- *     responses:
- *       201:
- *         description: Template created successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 templateId:
- *                   type: integer
- *       400:
- *         description: Bad request
- *       401:
- *         description: Unauthorized
- *       500:
- *         description: Server error
- */
-router.post('/create-template', authenticate, createTemplateFromCV);
 
 module.exports = router;

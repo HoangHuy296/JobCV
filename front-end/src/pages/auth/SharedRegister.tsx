@@ -10,6 +10,8 @@ const SharedRegister: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswords, setShowPasswords] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -38,11 +40,9 @@ const SharedRegister: React.FC = () => {
       const resp = await authService.register({ name, email, password, role });
       
       if (resp) {
+        setRegisteredEmail(email);
+        setRegistrationSuccess(true);
         toast.success('Đăng ký tài khoản thành công!');
-        if (isRecruiterRegistration)
-          navigate('/dang-nhap-nha-tuyen-dung');
-        else
-          navigate('/dang-nhap');
       }
     } catch (error: unknown) {
       console.error('Registration failed:', error);
@@ -50,6 +50,73 @@ const SharedRegister: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const handleGoToLogin = () => {
+    const loginPath = isRecruiterRegistration ? '/dang-nhap-nha-tuyen-dung' : '/dang-nhap';
+    navigate(loginPath, { state: { email: registeredEmail } });
+  };
+
+  // Show success message after registration
+  if (registrationSuccess) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+            <svg className="h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            Đăng ký thành công!
+          </h2>
+          <p className="text-lg text-gray-600 mb-4">
+            Chào mừng bạn đến với Job-CV Platform
+          </p>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <div className="flex items-start">
+            <svg className="h-6 w-6 text-blue-600 mt-0.5 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Kiểm tra email của bạn
+              </h3>
+              <p className="text-gray-700 mb-2">
+                Chúng tôi đã gửi email chào mừng đến <strong className="text-blue-600">{registeredEmail}</strong>
+              </p>
+              <p className="text-sm text-gray-600">
+                Vui lòng kiểm tra hộp thư đến (hoặc thư mục spam) để xem email chào mừng từ chúng tôi.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <button
+            onClick={handleGoToLogin}
+            className={`cursor-pointer flex w-full justify-center items-center rounded-md border border-transparent px-4 py-3 text-base font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 ${isRecruiterRegistration ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500' : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'}`}
+          >
+            <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+            </svg>
+            Đi đến trang đăng nhập
+          </button>
+          
+          <Link
+            to="/"
+            className="flex w-full justify-center items-center rounded-md border border-gray-300 bg-white px-4 py-3 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            Quay về trang chủ
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

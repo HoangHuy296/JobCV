@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { authService } from '../../api/authService';
 import { toast } from 'react-toastify';
@@ -12,6 +12,13 @@ const SharedLogin: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useUser();
+
+  // Pre-fill email if coming from registration
+  useEffect(() => {
+    if (location.state?.email) {
+      setEmail(location.state.email);
+    }
+  }, [location.state]);
 
   // Determine the login type based on the URL
   const isRecruiterLogin = location.pathname.includes('nha-tuyen-dung');

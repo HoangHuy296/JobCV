@@ -17,6 +17,7 @@ class Setting {
     return [
       // Domain settings
       { key: 'APP_URL', group: 'DOMAIN', value: '', description: 'Application URL' },
+      { key: 'FRONTEND_URL', group: 'DOMAIN', value: 'http://localhost:3000', description: 'Frontend application URL' },
       
       // Application settings
       { key: 'APP_NAME', group: 'SYSTEM', value: 'Job CV Application', description: 'Application Name' },
@@ -26,6 +27,19 @@ class Setting {
       
       // Report settings
       { key: 'MAX_JOB_REPORTS_PER_USER', group: 'REPORT', value: '3', description: 'Maximum number of times a user can report the same job' },
+      
+      // Email settings
+      { key: 'EMAIL_SERVICE', group: 'EMAIL', value: 'gmail', description: 'Email service provider (gmail, outlook, yahoo, etc.)' },
+      { key: 'EMAIL_USER', group: 'EMAIL', value: '', description: 'Email address for sending emails' },
+      { key: 'EMAIL_APP_PASSWORD', group: 'EMAIL', value: '', description: 'Email app-specific password' },
+      
+      // Email template settings - Password Reset
+      { key: 'EMAIL_RESET_SUBJECT', group: 'EMAIL_TEMPLATE', value: 'Đặt lại mật khẩu - Job-CV', description: 'Subject for password reset email' },
+      { key: 'EMAIL_RESET_BODY', group: 'EMAIL_TEMPLATE', value: 'Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn trên Job-CV Platform.', description: 'Body text for password reset email' },
+      
+      // Email template settings - Welcome
+      { key: 'EMAIL_WELCOME_SUBJECT', group: 'EMAIL_TEMPLATE', value: 'Chào mừng đến với Job-CV! 🎉', description: 'Subject for welcome email' },
+      { key: 'EMAIL_WELCOME_BODY', group: 'EMAIL_TEMPLATE', value: 'Cảm ơn bạn đã đăng ký tài khoản tại Job-CV Platform!', description: 'Body text for welcome email' },
     ];
   }
 

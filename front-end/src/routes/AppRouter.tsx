@@ -19,6 +19,8 @@ import NotFound from '../pages/public/NotFound';
 import UserDashboard from '../pages/user/UserDashboard';
 import LikedJobs from '../pages/user/LikedJobs';
 import SubscribedCompanies from '../pages/user/SubscribedCompanies';
+import CVManagement from '../pages/user/CVManagement';
+import ResumeBuilderCanvas from '../pages/user/ResumeBuilderCanvas';
 // Admin pages
 import * as Admin from '../pages/admin';
 // Recruiter pages
@@ -84,6 +86,8 @@ const AppRouter: React.FC = () => {
           <Route path="/bang-dieu-khien" element={<UserDashboard />} />
           <Route path="/cong-viec-da-thich" element={<LikedJobs />} />
           <Route path="/cong-ty-theo-doi" element={<SubscribedCompanies />} />
+          <Route path="/quan-ly-cv" element={<CVManagement />} />
+          <Route path="/tao-cv" element={<ResumeBuilderCanvas />} />
         </Route>
 
         {/* Recruiter routes */}

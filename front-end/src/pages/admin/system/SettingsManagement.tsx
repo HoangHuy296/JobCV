@@ -190,7 +190,9 @@ const SettingsManagement: React.FC = () => {
     { value: 'all', label: 'Tất cả' },
     { value: 'DOMAIN', label: 'DOMAIN' },
     { value: 'SYSTEM', label: 'SYSTEM' },
-    { value: 'REPORT', label: 'REPORT' }
+    { value: 'REPORT', label: 'REPORT' },
+    { value: 'EMAIL', label: 'EMAIL' },
+    { value: 'EMAIL_TEMPLATE', label: 'EMAIL_TEMPLATE' },
   ], []);
 
   // Handle group filter change

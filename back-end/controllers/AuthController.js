@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const { sendPasswordResetEmail, sendWelcomeEmail } = require('../config/nodemailer');
 require('dotenv').config();
 
 // Login user
@@ -112,6 +113,15 @@ const register = async (req, res) => {
     
     await User.create(userData);
     
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(email, name);
+      console.log(`Welcome email sent to ${email}`);
+    } catch (emailError) {
+      console.error('Error sending welcome email:', emailError);
+      // Continue even if email fails - registration is still successful
+    }
+    
     res.status(201).json({
       result: true,
       message: null
@@ -154,8 +164,15 @@ const forgotPassword = async (req, res) => {
     // Save token to database
     await User.createPasswordResetToken(user.id, resetToken, expiresAt);
     
-    // For development, log the token
-    console.log(`Password reset token for ${user.email}: ${resetToken}`);
+    // Send password reset email
+    try {
+      await sendPasswordResetEmail(user.email, resetToken, user.name);
+      console.log(`Password reset email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error('Error sending password reset email:', emailError);
+      // Continue even if email fails - token is still valid
+      // In production, you might want to handle this differently
+    }
     
     res.json({ result: true, message: null });
   } catch (error) {
