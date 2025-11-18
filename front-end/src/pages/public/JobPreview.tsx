@@ -3,8 +3,8 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { getJobPreview, type Job } from '../../api/jobService';
 import { toast } from 'react-toastify';
 
-// Extended Job interface for preview that includes additional properties
-interface JobPreviewData extends Job {
+// Extended Job type for preview that includes additional properties
+type JobPreviewData = Omit<Job, 'company_logo'> & {
     company_logo?: {
         url: string;
     };
@@ -14,7 +14,7 @@ interface JobPreviewData extends Job {
     is_live?: boolean;
     version_status?: string;
     version_number?: number;
-}
+};
 
 const JobPreview: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -116,7 +116,7 @@ const JobPreview: React.FC = () => {
                     </div>
                     {versionId && (
                         <p className="text-sm bg-blue-700 px-2 py-1 rounded">
-                            Đang xem phiên bản: {job.version_number || 'N/A'}
+                            Đang xem phiên bản: {job.version_number || 'Không xác định'}
                         </p>
                     )}
                 </div>
@@ -244,7 +244,7 @@ const JobPreview: React.FC = () => {
                                         <div className="mt-3 py-2 px-4 bg-blue-50 rounded-md">
                                             <div className="flex justify-between items-center">
                                                 <p className="text-sm text-blue-800">
-                                                    <span className="font-medium">Phiên bản:</span> {job.version_number || 'N/A'}
+                                                    <span className="font-medium">Phiên bản:</span> {job.version_number || 'Không xác định'}
                                                     {job.version_status && (
                                                         <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-100">
                                                             {job.version_status === 'draft' ? 'Bản nháp' :

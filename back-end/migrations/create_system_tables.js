@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
   role_id INT,
   is_active BOOLEAN DEFAULT TRUE,
   image_id INT NULL,
+  email_notifications_enabled BOOLEAN DEFAULT TRUE,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   modified_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted_at DATETIME NULL,
@@ -36,7 +37,8 @@ CREATE TABLE IF NOT EXISTS users (
   INDEX idx_role_id (role_id),
   INDEX idx_is_active (is_active),
   INDEX idx_created_at (created_at),
-  INDEX idx_deleted (deleted)
+  INDEX idx_deleted (deleted),
+  INDEX idx_email_notifications_enabled (email_notifications_enabled)
 );
 `;
 
@@ -49,6 +51,22 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   expires_at DATETIME NOT NULL,
   used BOOLEAN DEFAULT FALSE,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_token (token),
+  INDEX idx_user_id (user_id),
+  INDEX idx_expires_at (expires_at)
+);
+`;
+
+// Create email_verification_tokens table
+const createEmailVerificationTokensTable = `
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  token VARCHAR(255) NOT NULL UNIQUE,
+  expires_at DATETIME NOT NULL,
+  used BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_token (token),
   INDEX idx_user_id (user_id),
   INDEX idx_expires_at (expires_at)
@@ -103,6 +121,7 @@ const queries = [
   { sql: createRolesTable, name: 'roles table' },
   { sql: createUsersTable, name: 'users table' },
   { sql: createPasswordResetTokensTable, name: 'password_reset_tokens table' },
+  { sql: createEmailVerificationTokensTable, name: 'email_verification_tokens table' },
   { sql: createMediaTable, name: 'media table' },
   { sql: createSettingsTable, name: 'settings table' }
 ];

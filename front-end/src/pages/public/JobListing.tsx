@@ -112,7 +112,7 @@ const JobListing: React.FC = () => {
         setTotalPages(response.pagination.totalPages);
         setTotalItems(response.pagination.total);
       } catch (err) {
-        setError('Failed to fetch jobs');
+        setError('Không thể tải danh sách công việc');
         console.error('Error fetching jobs:', err);
       } finally {
         setLoading(false);

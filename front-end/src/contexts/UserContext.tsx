@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect, useMemo, useCall
 import { getUserFromToken, isTokenExpired } from '../utils/tokenUtils';
 import { getMyCompany } from '../api/companyService';
 import type { Company } from '../api/companyService';
+import { notificationWebSocket } from '../services/notificationWebSocket';
 
 // Define the user type
 interface User {
@@ -11,6 +12,7 @@ interface User {
   role: string;
   image: string | null;
   is_active: boolean;
+  email_notifications_enabled?: boolean;
 }
 
 // Define the context type
@@ -67,6 +69,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = React.memo(({ chi
     const userData = getUserFromToken(token);
     if (userData) {
       setUser(userData);
+      
+      // Connect to WebSocket for real-time notifications
+      notificationWebSocket.connect(token);
+      
       // If user is a recruiter, fetch their company
       if (userData.role === 'recruiter') {
         try {
@@ -85,10 +91,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = React.memo(({ chi
 
   // Optimized logout function with useCallback
   const logout = useCallback(() => {
+    // Disconnect WebSocket
+    notificationWebSocket.disconnect();
+    
     // Remove token from localStorage
     localStorage.removeItem('token');
     // Clear user state
     setUser(null);
+    setCompany(null);
   }, []);
 
   // Check for existing token on app load - optimized version
@@ -114,6 +124,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = React.memo(({ chi
           if (userData && userData.is_active) {
             if (isMounted) {
               setUser(userData);
+              // Connect to WebSocket for real-time notifications
+              notificationWebSocket.connect(token);
               // If user is a recruiter, fetch their company
               if (userData.role === 'recruiter') {
                 try {

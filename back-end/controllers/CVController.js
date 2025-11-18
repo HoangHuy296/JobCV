@@ -1,6 +1,8 @@
 const CV = require('../models/CV');
+const Notification = require('../models/Notification');
 const path = require('path');
 const fs = require('fs').promises;
+const db = require('../config/db');
 
 // Get all CVs for the current user with pagination and filtering
 const getUserCVs = async (req, res) => {
@@ -157,6 +159,49 @@ const downloadCV = async (req, res) => {
   }
 };
 
+// Check if CV is used in job applications
+const checkCVInApplications = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    
+    const cv = await CV.getByIdAndUserId(id, userId);
+    
+    if (!cv) {
+      return res.status(404).json({ result: null, message: 'Không tìm thấy CV' });
+    }
+    
+    // Check if CV is used in any job applications
+    const [applications] = await db.query(
+      `SELECT ja.id, ja.job_id, ja.status, j.title as job_title, j.created_by as recruiter_id,
+              u.name as recruiter_name
+       FROM job_applications ja
+       LEFT JOIN jobs j ON ja.job_id = j.id
+       LEFT JOIN users u ON j.created_by = u.id
+       WHERE ja.cv_id = ? AND ja.user_id = ?`,
+      [id, userId]
+    );
+    
+    res.json({
+      result: {
+        isUsed: applications.length > 0,
+        applications: applications.map(app => ({
+          id: app.id,
+          job_id: app.job_id,
+          job_title: app.job_title,
+          status: app.status,
+          recruiter_id: app.recruiter_id,
+          recruiter_name: app.recruiter_name
+        }))
+      },
+      message: null
+    });
+  } catch (error) {
+    console.error('Error checking CV in applications:', error);
+    res.status(500).json({ result: null, message: 'Kiểm tra CV thất bại' });
+  }
+};
+
 // Delete a CV file
 const deleteCV = async (req, res) => {
   try {
@@ -168,6 +213,15 @@ const deleteCV = async (req, res) => {
     if (!cv) {
       return res.status(404).json({ result: null, message: 'Không tìm thấy CV' });
     }
+    
+    // Check if CV is used in any job applications and notify recruiters
+    const [applications] = await db.query(
+      `SELECT ja.id, ja.job_id, j.title as job_title, j.created_by as recruiter_id
+       FROM job_applications ja
+       LEFT JOIN jobs j ON ja.job_id = j.id
+       WHERE ja.cv_id = ? AND ja.user_id = ?`,
+      [id, userId]
+    );
     
     // Delete the file from storage if it exists
     if (cv.file_path) {
@@ -182,7 +236,43 @@ const deleteCV = async (req, res) => {
     // Soft delete the CV record
     await CV.delete(id);
     
-    res.json({ result: true, message: null });
+    // Update job applications to remove CV reference
+    if (applications.length > 0) {
+      await db.query(
+        'UPDATE job_applications SET cv_id = NULL WHERE cv_id = ? AND user_id = ?',
+        [id, userId]
+      );
+      
+      // Notify recruiters about CV deletion
+      const notificationWS = req.app.get('notificationWS');
+      const notifiedRecruiters = new Set();
+      
+      for (const app of applications) {
+        if (app.recruiter_id && !notifiedRecruiters.has(app.recruiter_id)) {
+          const notification = await Notification.create({
+            user_id: app.recruiter_id,
+            title: 'Ứng viên đã xóa CV',
+            message: `${req.user.name} đã xóa CV được sử dụng trong đơn ứng tuyển cho công việc "${app.job_title}"`,
+            type: 'warning',
+            link: `/nha-tuyen-dung/quan-ly-cong-viec`
+          });
+          
+          if (notificationWS) {
+            notificationWS.sendToUser(app.recruiter_id, notification);
+          }
+          
+          notifiedRecruiters.add(app.recruiter_id);
+        }
+      }
+    }
+    
+    res.json({ 
+      result: { 
+        deleted: true,
+        affectedApplications: applications.length 
+      }, 
+      message: null 
+    });
   } catch (error) {
     console.error('Error deleting CV:', error);
     res.status(500).json({ result: null, message: 'Xóa CV thất bại' });
@@ -193,5 +283,6 @@ module.exports = {
   getUserCVs,
   uploadCV,
   downloadCV,
-  deleteCV
+  deleteCV,
+  checkCVInApplications
 };

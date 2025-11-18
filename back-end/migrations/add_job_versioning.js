@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS jobs (
   deleted BOOLEAN DEFAULT FALSE,
   current_version_id INT NULL,
   version_count INT DEFAULT 1,
+  is_closed BOOLEAN DEFAULT FALSE,
+  max_applicants INT DEFAULT NULL,
+  auto_close_on_threshold BOOLEAN DEFAULT FALSE,
   INDEX idx_title (title),
   INDEX idx_company_id (company_id),
   INDEX idx_industry_id (industry_id),
@@ -36,7 +39,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   INDEX idx_created_at (created_at),
   INDEX idx_date_end_register (date_end_register),
   INDEX idx_deleted (deleted),
-  INDEX idx_current_version_id (current_version_id)
+  INDEX idx_current_version_id (current_version_id),
+  INDEX idx_is_closed (is_closed)
 );
 `;
 

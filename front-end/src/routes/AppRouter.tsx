@@ -8,6 +8,8 @@ import SharedRegister from '../pages/auth/SharedRegister';
 import SharedLogin from '../pages/auth/SharedLogin';
 import ForgotPassword from '../pages/auth/ForgotPassword';
 import ResetPassword from '../pages/auth/ResetPassword';
+import EmailVerification from '../pages/auth/EmailVerification';
+import ResendVerification from '../pages/auth/ResendVerification';
 import Home from '../pages/Home';
 import CompanyListing from '../pages/public/CompanyListing';
 import CompanyDetail from '../pages/public/CompanyDetail';
@@ -20,7 +22,6 @@ import UserDashboard from '../pages/user/UserDashboard';
 import LikedJobs from '../pages/user/LikedJobs';
 import SubscribedCompanies from '../pages/user/SubscribedCompanies';
 import CVManagement from '../pages/user/CVManagement';
-import ResumeBuilderCanvas from '../pages/user/ResumeBuilderCanvas';
 // Admin pages
 import * as Admin from '../pages/admin';
 // Recruiter pages
@@ -63,6 +64,8 @@ const AppRouter: React.FC = () => {
           <Route path="/dang-ky-nha-tuyen-dung" element={<SharedRegister />} />
           <Route path="/quen-mat-khau" element={<ForgotPassword />} />
           <Route path="/dat-lai-mat-khau" element={<ResetPassword />} />
+          <Route path="/xac-thuc-email" element={<EmailVerification />} />
+          <Route path="/gui-lai-xac-thuc" element={<ResendVerification />} />
         </Route>
 
         {/* Public routes with header and footer */}
@@ -87,7 +90,6 @@ const AppRouter: React.FC = () => {
           <Route path="/cong-viec-da-thich" element={<LikedJobs />} />
           <Route path="/cong-ty-theo-doi" element={<SubscribedCompanies />} />
           <Route path="/quan-ly-cv" element={<CVManagement />} />
-          <Route path="/tao-cv" element={<ResumeBuilderCanvas />} />
         </Route>
 
         {/* Recruiter routes */}

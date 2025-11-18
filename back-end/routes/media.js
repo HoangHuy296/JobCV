@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { upload, createUploadMiddleware, uploadMedia, getMediaById, deleteMedia } = require('../controllers/MediaController');
+const { upload, createUploadMiddleware, uploadMedia, createMediaFromUrl, getMediaById, deleteMedia } = require('../controllers/MediaController');
 const authenticate = require('../middleware/auth');
 
 // Create upload middleware with dynamic file size limit
@@ -65,6 +65,50 @@ router.post('/upload', authenticate, (req, res, next) => {
   // Fallback to default if dynamic middleware isn't ready
   upload.single('file')(req, res, next);
 }, uploadMedia);
+
+/**
+ * @swagger
+ * /api/media/from-url:
+ *   post:
+ *     summary: Create media record from external URL
+ *     tags: [Media]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - url
+ *             properties:
+ *               url:
+ *                 type: string
+ *                 description: External URL of the image
+ *               original_name:
+ *                 type: string
+ *                 description: Optional original name for the media
+ *     responses:
+ *       200:
+ *         description: Media record created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 result:
+ *                   $ref: '#/components/schemas/Media'
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Invalid URL or missing required fields
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Error creating media record
+ */
+router.post('/from-url', authenticate, createMediaFromUrl);
 
 /**
  * @swagger

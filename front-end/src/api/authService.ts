@@ -31,4 +31,16 @@ export const authService = {
     // Remove token from localStorage
     localStorage.removeItem('token');
   },
+
+  // Verify email function
+  verifyEmail: async (token: string) => {
+    const response = await apiClient.post('/auth/verify-email', { token });
+    return response.data;
+  },
+
+  // Resend verification email function
+  resendVerification: async (email: string) => {
+    const response = await apiClient.post('/auth/resend-verification', { email });
+    return response.data;
+  },
 };

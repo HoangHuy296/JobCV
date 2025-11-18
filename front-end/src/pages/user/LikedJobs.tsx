@@ -3,18 +3,81 @@ import { useNavigate } from 'react-router-dom';
 import { getUserLikedJobs, unlikeJob, type Job } from '../../api/jobService';
 import { toast } from 'react-toastify';
 import { LuHeart, LuBriefcase, LuMapPin, LuCalendar, LuDollarSign, LuLoader, LuHeartOff } from 'react-icons/lu';
+import { usePagination } from '../../hooks/usePagination';
+
+// Memoized JobCard component to prevent unnecessary re-renders
+const JobCard = React.memo(({ 
+  job, 
+  onUnlike, 
+  onViewJob, 
+  formatDate 
+}: { 
+  job: Job; 
+  onUnlike: (id: number) => void; 
+  onViewJob: (id: number) => void;
+  formatDate: (date: string) => string;
+}) => (
+  <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden border border-gray-200">
+    <div className="p-6">
+      {job.company_logo && (
+        <div className="flex justify-center mb-4">
+          <img
+            src={job.company_logo}
+            alt={job.company_name}
+            className="h-16 w-16 object-contain rounded"
+          />
+        </div>
+      )}
+
+      <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+        {job.title}
+      </h3>
+
+      <p className="text-sm text-gray-600 mb-3 flex items-center gap-1">
+        <LuBriefcase className="w-4 h-4" />
+        {job.company_name}
+      </p>
+
+      <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
+        <LuMapPin className="w-4 h-4" />
+        {job.location}
+      </p>
+
+      <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
+        <LuDollarSign className="w-4 h-4" />
+        {job.salary}
+      </p>
+
+      <p className="text-sm text-gray-500 mb-4 flex items-center gap-1">
+        <LuCalendar className="w-4 h-4" />
+        Hạn nộp: {formatDate(job.date_end_register)}
+      </p>
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => onViewJob(job.id)}
+          className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium cursor-pointer"
+        >
+          Xem chi tiết
+        </button>
+        <button
+          onClick={() => onUnlike(job.id)}
+          className="px-4 py-2 border border-red-300 text-red-600 rounded-md hover:bg-red-50 transition-colors cursor-pointer"
+          title="Bỏ thích"
+        >
+          <LuHeart className="w-5 h-5 fill-current" />
+        </button>
+      </div>
+    </div>
+  </div>
+));
+JobCard.displayName = 'JobCard';
 
 const LikedJobs: React.FC = () => {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 0
-  });
+  const { currentPage, setCurrentPage, pagination, setPagination } = usePagination(10);
 
   const fetchLikedJobs = useCallback(async (page: number = 1) => {
     try {
@@ -22,20 +85,19 @@ const LikedJobs: React.FC = () => {
       const response = await getUserLikedJobs(page, 10);
       setJobs(response.jobs);
       setPagination(response.pagination);
-      setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching liked jobs:', error);
       toast.error('Không thể tải danh sách công việc đã thích');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setPagination]);
 
   useEffect(() => {
-    fetchLikedJobs(1);
-  }, [fetchLikedJobs]);
+    fetchLikedJobs(currentPage);
+  }, [currentPage, fetchLikedJobs]);
 
-  const handleUnlike = async (jobId: number) => {
+  const handleUnlike = useCallback(async (jobId: number) => {
     try {
       await unlikeJob(jobId);
       toast.success('Đã bỏ thích công việc');
@@ -44,15 +106,15 @@ const LikedJobs: React.FC = () => {
       console.error('Error unliking job:', error);
       toast.error('Không thể bỏ thích công việc');
     }
-  };
+  }, [currentPage, fetchLikedJobs]);
 
-  const handleViewJob = (jobId: number) => {
+  const handleViewJob = useCallback((jobId: number) => {
     navigate(`/viec-lam/${jobId}`);
-  };
+  }, [navigate]);
 
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN');
-  };
+  }, []);
 
   if (loading) {
     return (
@@ -117,69 +179,13 @@ const LikedJobs: React.FC = () => {
         <>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {jobs.map((job) => (
-              <div
+              <JobCard
                 key={job.id}
-                className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden border border-gray-200"
-              >
-                <div className="p-6">
-                  {/* Company Logo */}
-                  {job.company_logo && (
-                    <div className="flex justify-center mb-4">
-                      <img
-                        src={job.company_logo}
-                        alt={job.company_name}
-                        className="h-16 w-16 object-contain rounded"
-                      />
-                    </div>
-                  )}
-
-                  {/* Job Title */}
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                    {job.title}
-                  </h3>
-
-                  {/* Company Name */}
-                  <p className="text-sm text-gray-600 mb-3 flex items-center gap-1">
-                    <LuBriefcase className="w-4 h-4" />
-                    {job.company_name}
-                  </p>
-
-                  {/* Location */}
-                  <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
-                    <LuMapPin className="w-4 h-4" />
-                    {job.location}
-                  </p>
-
-                  {/* Salary */}
-                  <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
-                    <LuDollarSign className="w-4 h-4" />
-                    {job.salary}
-                  </p>
-
-                  {/* Deadline */}
-                  <p className="text-sm text-gray-500 mb-4 flex items-center gap-1">
-                    <LuCalendar className="w-4 h-4" />
-                    Hạn nộp: {formatDate(job.date_end_register)}
-                  </p>
-
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleViewJob(job.id)}
-                      className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium cursor-pointer"
-                    >
-                      Xem chi tiết
-                    </button>
-                    <button
-                      onClick={() => handleUnlike(job.id)}
-                      className="px-4 py-2 border border-red-300 text-red-600 rounded-md hover:bg-red-50 transition-colors cursor-pointer"
-                      title="Bỏ thích"
-                    >
-                      <LuHeart className="w-5 h-5 fill-current" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+                job={job}
+                onUnlike={handleUnlike}
+                onViewJob={handleViewJob}
+                formatDate={formatDate}
+              />
             ))}
           </div>
 
@@ -187,7 +193,7 @@ const LikedJobs: React.FC = () => {
           {pagination.totalPages > 1 && (
             <div className="mt-8 flex justify-center items-center gap-2">
               <button
-                onClick={() => fetchLikedJobs(currentPage - 1)}
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
                 className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
@@ -197,7 +203,7 @@ const LikedJobs: React.FC = () => {
                 Trang {currentPage} / {pagination.totalPages}
               </span>
               <button
-                onClick={() => fetchLikedJobs(currentPage + 1)}
+                onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
                 disabled={currentPage === pagination.totalPages}
                 className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >

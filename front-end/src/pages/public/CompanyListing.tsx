@@ -52,7 +52,7 @@ const CompanyListing: React.FC = () => {
         setTotalPages(response.pagination.totalPages);
         setTotalItems(response.pagination.total);
       } catch (err) {
-        setError('Failed to fetch companies');
+        setError('Không thể tải danh sách công ty');
         console.error('Error fetching companies:', err);
       } finally {
         setLoading(false);

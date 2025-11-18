@@ -29,6 +29,9 @@ export interface Job {
   deleted_at: string | null;
   deleted: boolean;
   status: 'draft' | 'pending_review' | 'approved' | 'rejected';
+  is_closed?: boolean;
+  max_applicants?: number | null;
+  auto_close_on_threshold?: boolean;
   // Versioning fields
   current_version_id?: number;
   version_count?: number;
@@ -56,6 +59,8 @@ export interface CreateJobData {
   industry_id: number;
   location: string;
   status?: 'draft' | 'pending_review' | 'approved' | 'rejected';
+  max_applicants?: number | null;
+  auto_close_on_threshold?: boolean;
 }
 
 export interface UpdateJobData {
@@ -71,6 +76,8 @@ export interface UpdateJobData {
   industry_id?: number;
   location?: string;
   status?: 'draft' | 'pending_review' | 'approved' | 'rejected';
+  max_applicants?: number | null;
+  auto_close_on_threshold?: boolean;
 }
 
 // Create a new job
@@ -232,6 +239,17 @@ export const getUserLikedJobs = async (page: number = 1, limit: number = 10): Pr
     return response.data.result;
   } catch (error) {
     console.error('Error getting user liked jobs:', error);
+    throw error;
+  }
+};
+
+// Close a job (recruiter only)
+export const closeJob = async (jobId: number): Promise<boolean> => {
+  try {
+    const response = await api.put(`/jobs/${jobId}/close`);
+    return response.data.result;
+  } catch (error) {
+    console.error('Error closing job:', error);
     throw error;
   }
 };

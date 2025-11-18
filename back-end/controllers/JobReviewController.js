@@ -1,10 +1,10 @@
-const db = require('../config/db');
-const JobReport = require('../models/JobReport');
 const Job = require('../models/Job');
-const User = require('../models/User');
+const JobReport = require('../models/JobReport');
 const JobReview = require('../models/JobReview');
-const Setting = require('../models/Setting');
 const Notification = require('../models/Notification');
+const Setting = require('../models/Setting');
+const User = require('../models/User');
+const db = require('../config/db');
 
 const submitForReview = async (req, res) => {
     try {

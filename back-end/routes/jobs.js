@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authenticate = require('../middleware/auth');
+const { jobValidationMiddleware } = require('../middleware/jobValidation');
 const {
   createJob,
   getAllJobs,
@@ -13,7 +14,8 @@ const {
   unlikeJob,
   checkLikeStatus,
   getJobPreview,
-  getUserLikedJobs
+  getUserLikedJobs,
+  closeJob
 } = require('../controllers/JobController');
 
 // Import JobVersionController
@@ -46,15 +48,16 @@ router.get('/:id', getJobById);
 // Protected job-specific routes with ID parameter
 router.put('/:id', updateJob);
 router.delete('/:id', deleteJob);
+router.put('/:id/close', closeJob);
 
 // Create a new job
-router.post('/', createJob);
+router.post('/', jobValidationMiddleware, createJob);
 
 // Job Version routes - place before other :jobId routes to ensure proper matching
-router.post('/:jobId/versions', createJobVersion);
+router.post('/:jobId/versions', jobValidationMiddleware, createJobVersion);
 router.get('/:jobId/versions', getJobVersions);
 router.get('/:jobId/versions/:versionId', getJobVersion);
-router.put('/:jobId/versions/:versionId', updateJobVersion);
+router.put('/:jobId/versions/:versionId', jobValidationMiddleware, updateJobVersion);
 router.delete('/:jobId/versions/:versionId', deleteJobVersion);
 router.put('/:jobId/versions/:versionId/live', setVersionLive);
 router.put('/:jobId/versions/:versionId/review', reviewJobVersion);

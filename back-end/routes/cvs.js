@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-const { getUserCVs, uploadCV, downloadCV, deleteCV } = require('../controllers/CVController');
+const { getUserCVs, uploadCV, downloadCV, deleteCV, checkCVInApplications } = require('../controllers/CVController');
 const authenticate = require('../middleware/auth');
 
 // Configure multer for CV file uploads
@@ -198,6 +198,31 @@ router.post('/', authenticate, upload.single('file'), uploadCV);
  *         description: Server error
  */
 router.get('/:id', authenticate, downloadCV);
+
+/**
+ * @swagger
+ * /api/cvs/{id}/check-applications:
+ *   get:
+ *     summary: Check if CV is used in job applications
+ *     tags: [CVs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: CV ID
+ *     responses:
+ *       200:
+ *         description: CV application check result
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: CV not found
+ */
+router.get('/:id/check-applications', authenticate, checkCVInApplications);
 
 /**
  * @swagger

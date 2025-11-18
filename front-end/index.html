@@ -1,13 +1,155 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JobBoard | Nền tảng kết nối việc làm</title>
+    <meta
+      name="description"
+      content="JobBoard giúp nhà tuyển dụng và ứng viên kết nối nhanh chóng với hệ sinh thái tuyển dụng hiện đại."
+    />
+    <meta name="theme-color" content="#2563eb" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background-color: #f8fafc;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #f1f5f9;
+        color: #0f172a;
+      }
+
+      .jb-splash {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #eff6ff, #ede9fe);
+        padding: 24px;
+      }
+
+      .jb-card {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        align-items: center;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(12px);
+        border-radius: 20px;
+        padding: 32px 40px;
+        box-shadow: 0 25px 50px -12px rgba(30, 64, 175, 0.25);
+        max-width: 360px;
+      }
+
+      .jb-icon {
+        display: grid;
+        place-items: center;
+        width: 64px;
+        height: 64px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, #2563eb, #4f46e5);
+        color: #fff;
+        box-shadow: 0 15px 30px -12px rgba(37, 99, 235, 0.8);
+        animation: jb-float 2.8s ease-in-out infinite;
+      }
+
+      .jb-title {
+        font-size: clamp(1.25rem, 2vw + 1rem, 1.5rem);
+        font-weight: 700;
+        color: #1d4ed8;
+        margin: 0;
+      }
+
+      .jb-caption {
+        font-size: 0.95rem;
+        color: #475569;
+        margin: 0;
+        line-height: 1.6;
+      }
+
+      .jb-bar {
+        position: relative;
+        width: 160px;
+        height: 6px;
+        border-radius: 999px;
+        background: #bfdbfe;
+        overflow: hidden;
+      }
+
+      .jb-bar::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        width: 60%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #2563eb, #4f46e5);
+        animation: jb-progress 1.6s ease-in-out infinite;
+      }
+
+      @keyframes jb-progress {
+        0% {
+          transform: translateX(-100%);
+        }
+        50% {
+          transform: translateX(20%);
+        }
+        100% {
+          transform: translateX(100%);
+        }
+      }
+
+      @keyframes jb-float {
+        0%,
+        100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-8px);
+        }
+      }
+
+      noscript {
+        display: block;
+        margin-top: 16px;
+        font-size: 0.9rem;
+        color: #ef4444;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="jb-splash">
+        <div class="jb-card">
+          <div class="jb-icon" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="jb-title">JobBoard đang khởi chạy...</p>
+            <p class="jb-caption">Kết nối ứng viên và nhà tuyển dụng trên nền tảng tuyển dụng hàng đầu.</p>
+          </div>
+          <div class="jb-bar" aria-hidden="true"></div>
+          <noscript>Vui lòng bật JavaScript để tiếp tục sử dụng JobBoard.</noscript>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

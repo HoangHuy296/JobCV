@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getUserCVs, uploadCV, deleteCV, downloadCV, type CV } from '../../api/cvService';
+import { getUserCVs, uploadCV, deleteCV, downloadCV, checkCVInApplications, type CV } from '../../api/cvService';
 import { toast } from 'react-toastify';
 import { 
   LuFileText, 
@@ -11,6 +11,7 @@ import {
   LuCalendar,
   LuX
 } from 'react-icons/lu';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 const CVManagement: React.FC = () => {
   const [cvs, setCvs] = useState<CV[]>([]);
@@ -29,6 +30,15 @@ const CVManagement: React.FC = () => {
     title: '',
     file: null as File | null
   });
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [cvToDelete, setCvToDelete] = useState<number | null>(null);
+  const [affectedApplications, setAffectedApplications] = useState<Array<{
+    id: number;
+    job_id: number;
+    job_title: string;
+    status: string;
+  }>>([]);
+  const [checkingApplications, setCheckingApplications] = useState(false);
 
   const fetchCVs = useCallback(async (page: number = 1, search: string = '') => {
     try {
@@ -135,19 +145,41 @@ const CVManagement: React.FC = () => {
     }
   };
 
-  const handleDelete = async (cvId: number) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa CV này?')) {
-      return;
+  const handleDeleteClick = async (cvId: number) => {
+    setCvToDelete(cvId);
+    setCheckingApplications(true);
+    
+    try {
+      const result = await checkCVInApplications(cvId);
+      setAffectedApplications(result.applications);
+      setShowConfirmDelete(true);
+    } catch (error) {
+      console.error('Error checking CV applications:', error);
+      toast.error('Không thể kiểm tra đơn ứng tuyển');
+    } finally {
+      setCheckingApplications(false);
     }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!cvToDelete) return;
 
     try {
-      await deleteCV(cvId);
+      await deleteCV(cvToDelete);
       toast.success('Xóa CV thành công');
+      setShowConfirmDelete(false);
+      setCvToDelete(null);
       fetchCVs(currentPage, searchTerm);
     } catch (error) {
       console.error('Error deleting CV:', error);
       toast.error('Không thể xóa CV');
     }
+  };
+
+  const handleCancelDelete = () => {
+    setShowConfirmDelete(false);
+    setCvToDelete(null);
+    setAffectedApplications([]);
   };
 
 
@@ -288,7 +320,7 @@ const CVManagement: React.FC = () => {
                   <span className="text-sm font-medium">Tải xuống</span>
                 </button>
                 <button
-                  onClick={() => handleDelete(cv.id)}
+                  onClick={() => handleDeleteClick(cv.id)}
                   className="flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors cursor-pointer"
                   title="Xóa"
                 >
@@ -419,6 +451,21 @@ const CVManagement: React.FC = () => {
         </div>
       )}
 
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={showConfirmDelete}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        title="Xác nhận xóa CV"
+        message={
+          affectedApplications.length > 0
+            ? `CV này đang được sử dụng trong ${affectedApplications.length} đơn ứng tuyển:\n\n${affectedApplications.map(app => `- ${app.job_title} (${app.status})`).join('\n')}\n\nNếu bạn xóa CV này, các đơn ứng tuyển sẽ không còn CV đính kèm và nhà tuyển dụng sẽ được thông báo. Bạn có chắc chắn muốn tiếp tục?`
+            : 'Bạn có chắc chắn muốn xóa CV này? Hành động này không thể hoàn tác.'
+        }
+        confirmText="Xóa"
+        cancelText="Hủy"
+        type="danger"
+      />
     </div>
   );
 };

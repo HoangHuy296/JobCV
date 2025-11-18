@@ -1,0 +1,608 @@
+const JobApplication = require('../models/JobApplication');
+const Notification = require('../models/Notification');
+const db = require('../config/db');
+const { sendApplicationConfirmationEmail, sendNewApplicationEmail, sendThresholdReachedEmail } = require('../config/nodemailer');
+
+// Apply for a job
+const applyForJob = async (req, res) => {
+  try {
+    const { job_id, cv_id, cover_letter } = req.body;
+    const user_id = req.user.id;
+
+    // Validate required fields
+    if (!job_id) {
+      return res.status(400).json({
+        result: null,
+        message: 'Job ID là bắt buộc'
+      });
+    }
+
+    // Check if job exists and is still open
+    const [jobResults] = await db.query(
+      `SELECT j.id, j.title, j.date_end_register, j.status, j.created_by, j.is_closed,
+              j.max_applicants, j.auto_close_on_threshold,
+              u.name as recruiter_name, u.email as recruiter_email
+       FROM jobs j
+       LEFT JOIN users u ON j.created_by = u.id
+       WHERE j.id = ? AND j.deleted_at IS NULL AND j.deleted = FALSE`,
+      [job_id]
+    );
+
+    if (jobResults.length === 0) {
+      return res.status(404).json({
+        result: null,
+        message: 'Công việc không tồn tại'
+      });
+    }
+
+    const job = jobResults[0];
+
+    // Check if job is closed
+    if (job.is_closed) {
+      return res.status(400).json({
+        result: null,
+        message: 'Công việc đã đóng, không thể ứng tuyển'
+      });
+    }
+
+    // Check if job is approved
+    if (job.status !== 'approved') {
+      return res.status(400).json({
+        result: null,
+        message: 'Công việc chưa được phê duyệt'
+      });
+    }
+
+    // Check if registration deadline has passed
+    if (job.date_end_register) {
+      const endDate = new Date(job.date_end_register);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (endDate < today) {
+        return res.status(400).json({
+          result: null,
+          message: 'Hạn nộp hồ sơ đã kết thúc'
+        });
+      }
+    }
+
+    // Check if user has already applied
+    const hasApplied = await JobApplication.hasApplied(job_id, user_id);
+    if (hasApplied) {
+      return res.status(400).json({
+        result: null,
+        message: 'Bạn đã ứng tuyển công việc này rồi'
+      });
+    }
+    
+    // Check if max applicants threshold has been reached
+    if (job.max_applicants) {
+      const [countResult] = await db.query(
+        'SELECT COUNT(*) as count FROM job_applications WHERE job_id = ?',
+        [job_id]
+      );
+      
+      const currentApplicants = countResult[0].count;
+      
+      if (currentApplicants >= job.max_applicants) {
+        return res.status(400).json({
+          result: null,
+          message: 'Công việc đã đạt số lượng ứng viên tối đa'
+        });
+      }
+    }
+
+    // If CV is provided, verify it belongs to the user
+    if (cv_id) {
+      const [cvResults] = await db.query(
+        'SELECT id FROM cvs WHERE id = ? AND user_id = ? AND deleted_at IS NULL AND deleted = FALSE',
+        [cv_id, user_id]
+      );
+
+      if (cvResults.length === 0) {
+        return res.status(400).json({
+          result: null,
+          message: 'CV không tồn tại hoặc không thuộc về bạn'
+        });
+      }
+    }
+
+    // Create application
+    const application = await JobApplication.create({
+      job_id,
+      user_id,
+      cv_id: cv_id || null,
+      cover_letter: cover_letter || null,
+      status: 'pending'
+    });
+
+    // Send notification to recruiter
+    if (job.created_by) {
+      const notification = await Notification.create({
+        user_id: job.created_by,
+        title: 'Ứng viên mới ứng tuyển',
+        message: `${req.user.name} đã ứng tuyển vào công việc "${job.title}"`,
+        type: 'application',
+        link: `/nha-tuyen-dung/quan-ly-cong-viec`
+      });
+
+      // Send WebSocket notification
+      const notificationWS = req.app.get('notificationWS');
+      if (notificationWS) {
+        notificationWS.sendToUser(job.created_by, notification);
+      }
+      
+      // Send email to recruiter (check email_notifications_enabled first)
+      const [recruiterPrefs] = await db.query(
+        'SELECT email_notifications_enabled FROM users WHERE id = ?',
+        [job.created_by]
+      );
+      if (job.recruiter_email && recruiterPrefs[0]?.email_notifications_enabled) {
+        await sendNewApplicationEmail(
+          job.recruiter_email,
+          job.recruiter_name,
+          req.user.name,
+          job.title
+        );
+      }
+    }
+    
+    // Send confirmation notification to user
+    const userNotification = await Notification.create({
+      user_id: user_id,
+      title: 'Ứng tuyển thành công',
+      message: `Bạn đã ứng tuyển thành công vào công việc "${job.title}"`,
+      type: 'success',
+      link: `/bang-dieu-khien`
+    });
+    
+    const notificationWS = req.app.get('notificationWS');
+    if (notificationWS) {
+      notificationWS.sendToUser(user_id, userNotification);
+    }
+    
+    // Send confirmation email to user (check email_notifications_enabled first)
+    if (req.user.email && req.user.email_notifications_enabled) {
+      await sendApplicationConfirmationEmail(
+        req.user.email,
+        req.user.name,
+        job.title
+      );
+    }
+    
+    // Check if threshold has been reached after this application
+    if (job.max_applicants) {
+      const [countResult] = await db.query(
+        'SELECT COUNT(*) as count FROM job_applications WHERE job_id = ?',
+        [job_id]
+      );
+      
+      const currentApplicants = countResult[0].count;
+      
+      if (currentApplicants >= job.max_applicants) {
+        // Threshold reached - always notify recruiter
+        let notificationTitle = 'Đạt ngưỡng ứng viên';
+        let notificationMessage = `Công việc "${job.title}" đã đạt ngưỡng ${job.max_applicants} ứng viên`;
+        let notificationType = 'warning';
+        
+        // Auto-close if enabled
+        if (job.auto_close_on_threshold) {
+          await db.query(
+            'UPDATE jobs SET is_closed = TRUE WHERE id = ?',
+            [job_id]
+          );
+          
+          notificationTitle = 'Công việc đã tự động đóng';
+          notificationMessage = `Công việc "${job.title}" đã được tự động đóng sau khi đạt ${job.max_applicants} ứng viên`;
+          notificationType = 'info';
+        }
+        
+        // Send notification to recruiter
+        if (job.created_by) {
+          const thresholdNotification = await Notification.create({
+            user_id: job.created_by,
+            title: notificationTitle,
+            message: notificationMessage,
+            type: notificationType,
+            link: `/nha-tuyen-dung/quan-ly-cong-viec`
+          });
+          
+          const notificationWS = req.app.get('notificationWS');
+          if (notificationWS) {
+            notificationWS.sendToUser(job.created_by, thresholdNotification);
+          }
+        }
+        
+        // Send email notification to recruiter (check email_notifications_enabled first)
+        const [recruiterPrefs] = await db.query(
+          'SELECT email_notifications_enabled FROM users WHERE id = ?',
+          [job.created_by]
+        );
+        if (job.recruiter_email && recruiterPrefs[0]?.email_notifications_enabled) {
+          await sendThresholdReachedEmail(
+            job.recruiter_email,
+            job.recruiter_name,
+            job.title,
+            job.max_applicants,
+            job.auto_close_on_threshold
+          );
+        }
+      }
+    }
+
+    res.status(201).json({
+      result: application,
+      message: 'Ứng tuyển thành công'
+    });
+  } catch (error) {
+    console.error('Error applying for job:', error);
+    res.status(500).json({
+      result: null,
+      message: 'Lỗi khi ứng tuyển công việc'
+    });
+  }
+};
+
+// Get user's applications
+const getMyApplications = async (req, res) => {
+  try {
+    const user_id = req.user.id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+
+    const data = await JobApplication.findByUserId(user_id, page, limit);
+
+    res.json({
+      result: data,
+      message: null
+    });
+  } catch (error) {
+    console.error('Error fetching user applications:', error);
+    res.status(500).json({
+      result: null,
+      message: 'Lỗi khi tải danh sách ứng tuyển'
+    });
+  }
+};
+
+// Get applications for a job (recruiter/admin only)
+const getJobApplications = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const status = req.query.status || null;
+
+    // Check if user has permission to view applications
+    const userRole = req.user.role;
+    if (userRole !== 'admin' && userRole !== 'recruiter') {
+      return res.status(403).json({
+        result: null,
+        message: 'Bạn không có quyền xem danh sách ứng tuyển'
+      });
+    }
+
+    // If recruiter, verify they own the job
+    if (userRole === 'recruiter') {
+      const [jobResults] = await db.query(
+        'SELECT created_by FROM jobs WHERE id = ? AND deleted_at IS NULL AND deleted = FALSE',
+        [id]
+      );
+
+      if (jobResults.length === 0 || jobResults[0].created_by !== req.user.id) {
+        return res.status(403).json({
+          result: null,
+          message: 'Bạn không có quyền xem danh sách ứng tuyển của công việc này'
+        });
+      }
+    }
+
+    const data = await JobApplication.findByJobId(id, page, limit, status);
+
+    res.json({
+      result: data,
+      message: null
+    });
+  } catch (error) {
+    console.error('Error fetching job applications:', error);
+    res.status(500).json({
+      result: null,
+      message: 'Lỗi khi tải danh sách ứng tuyển'
+    });
+  }
+};
+
+// Get application details
+const getApplicationById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const application = await JobApplication.findById(id);
+
+    if (!application) {
+      return res.status(404).json({
+        result: null,
+        message: 'Đơn ứng tuyển không tồn tại'
+      });
+    }
+
+    // Check permissions
+    const userRole = req.user.role;
+    const userId = req.user.id;
+
+    if (userRole === 'user' && application.user_id !== userId) {
+      return res.status(403).json({
+        result: null,
+        message: 'Bạn không có quyền xem đơn ứng tuyển này'
+      });
+    }
+
+    if (userRole === 'recruiter') {
+      const [jobResults] = await db.query(
+        'SELECT created_by FROM jobs WHERE id = ?',
+        [application.job_id]
+      );
+
+      if (jobResults.length === 0 || jobResults[0].created_by !== userId) {
+        return res.status(403).json({
+          result: null,
+          message: 'Bạn không có quyền xem đơn ứng tuyển này'
+        });
+      }
+    }
+
+    res.json({
+      result: application,
+      message: null
+    });
+  } catch (error) {
+    console.error('Error fetching application:', error);
+    res.status(500).json({
+      result: null,
+      message: 'Lỗi khi tải thông tin đơn ứng tuyển'
+    });
+  }
+};
+
+// Update application status (recruiter/admin only)
+const updateApplicationStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, notes } = req.body;
+    const reviewedBy = req.user.id;
+
+    // Validate status
+    const validStatuses = ['pending', 'reviewing', 'shortlisted', 'rejected', 'accepted'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        result: null,
+        message: 'Trạng thái không hợp lệ'
+      });
+    }
+
+    // Check permissions
+    const userRole = req.user.role;
+    if (userRole !== 'admin' && userRole !== 'recruiter') {
+      return res.status(403).json({
+        result: null,
+        message: 'Bạn không có quyền cập nhật trạng thái ứng tuyển'
+      });
+    }
+
+    // Get application
+    const application = await JobApplication.findById(id);
+    if (!application) {
+      return res.status(404).json({
+        result: null,
+        message: 'Đơn ứng tuyển không tồn tại'
+      });
+    }
+
+    // If recruiter, verify they own the job
+    if (userRole === 'recruiter') {
+      const [jobResults] = await db.query(
+        'SELECT created_by FROM jobs WHERE id = ?',
+        [application.job_id]
+      );
+
+      if (jobResults.length === 0 || jobResults[0].created_by !== req.user.id) {
+        return res.status(403).json({
+          result: null,
+          message: 'Bạn không có quyền cập nhật đơn ứng tuyển này'
+        });
+      }
+    }
+
+    const updatedApplication = await JobApplication.updateStatus(id, status, reviewedBy, notes);
+
+    res.json({
+      result: updatedApplication,
+      message: 'Cập nhật trạng thái thành công'
+    });
+  } catch (error) {
+    console.error('Error updating application status:', error);
+    res.status(500).json({
+      result: null,
+      message: 'Lỗi khi cập nhật trạng thái'
+    });
+  }
+};
+
+// Withdraw application (user only)
+const withdrawApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const application = await JobApplication.findById(id);
+    if (!application) {
+      return res.status(404).json({
+        result: null,
+        message: 'Đơn ứng tuyển không tồn tại'
+      });
+    }
+
+    if (application.user_id !== userId) {
+      return res.status(403).json({
+        result: null,
+        message: 'Bạn không có quyền rút đơn ứng tuyển này'
+      });
+    }
+
+    // Can only withdraw if status is pending or reviewing
+    if (!['pending', 'reviewing'].includes(application.status)) {
+      return res.status(400).json({
+        result: null,
+        message: 'Không thể rút đơn ứng tuyển ở trạng thái hiện tại'
+      });
+    }
+
+    await JobApplication.delete(id);
+
+    res.json({
+      result: true,
+      message: 'Rút đơn ứng tuyển thành công'
+    });
+  } catch (error) {
+    console.error('Error withdrawing application:', error);
+    res.status(500).json({
+      result: null,
+      message: 'Lỗi khi rút đơn ứng tuyển'
+    });
+  }
+};
+
+// Get job application statistics
+const getJobApplicationStats = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check permissions
+    const userRole = req.user.role;
+    if (userRole !== 'admin' && userRole !== 'recruiter') {
+      return res.status(403).json({
+        result: null,
+        message: 'Bạn không có quyền xem thống kê'
+      });
+    }
+
+    // If recruiter, verify they own the job
+    if (userRole === 'recruiter') {
+      const [jobResults] = await db.query(
+        'SELECT created_by FROM jobs WHERE id = ?',
+        [id]
+      );
+
+      if (jobResults.length === 0 || jobResults[0].created_by !== req.user.id) {
+        return res.status(403).json({
+          result: null,
+          message: 'Bạn không có quyền xem thống kê của công việc này'
+        });
+      }
+    }
+
+    const stats = await JobApplication.getJobStats(id);
+
+    res.json({
+      result: stats,
+      message: null
+    });
+  } catch (error) {
+    console.error('Error fetching application stats:', error);
+    res.status(500).json({
+      result: null,
+      message: 'Lỗi khi tải thống kê'
+    });
+  }
+};
+
+// Update CV for application (user only, before job is closed)
+const updateApplicationCV = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { cv_id } = req.body;
+    const userId = req.user.id;
+
+    if (!cv_id) {
+      return res.status(400).json({
+        result: null,
+        message: 'CV ID là bắt buộc'
+      });
+    }
+
+    // Get application with job info
+    const application = await JobApplication.findById(id);
+    if (!application) {
+      return res.status(404).json({
+        result: null,
+        message: 'Đơn ứng tuyển không tồn tại'
+      });
+    }
+
+    // Check if user owns this application
+    if (application.user_id !== userId) {
+      return res.status(403).json({
+        result: null,
+        message: 'Bạn không có quyền cập nhật đơn ứng tuyển này'
+      });
+    }
+
+    // Check if job is closed
+    const [jobResults] = await db.query(
+      'SELECT is_closed FROM jobs WHERE id = ?',
+      [application.job_id]
+    );
+
+    if (jobResults.length === 0) {
+      return res.status(404).json({
+        result: null,
+        message: 'Công việc không tồn tại'
+      });
+    }
+
+    if (jobResults[0].is_closed) {
+      return res.status(400).json({
+        result: null,
+        message: 'Không thể cập nhật CV khi công việc đã đóng'
+      });
+    }
+
+    // Verify CV belongs to user
+    const [cvResults] = await db.query(
+      'SELECT id FROM cvs WHERE id = ? AND user_id = ? AND deleted_at IS NULL AND deleted = FALSE',
+      [cv_id, userId]
+    );
+
+    if (cvResults.length === 0) {
+      return res.status(400).json({
+        result: null,
+        message: 'CV không tồn tại hoặc không thuộc về bạn'
+      });
+    }
+
+    // Update CV
+    const updatedApplication = await JobApplication.updateCV(id, cv_id);
+
+    res.json({
+      result: updatedApplication,
+      message: 'Cập nhật CV thành công'
+    });
+  } catch (error) {
+    console.error('Error updating application CV:', error);
+    res.status(500).json({
+      result: null,
+      message: 'Lỗi khi cập nhật CV'
+    });
+  }
+};
+
+module.exports = {
+  applyForJob,
+  getMyApplications,
+  getJobApplications,
+  getApplicationById,
+  updateApplicationStatus,
+  withdrawApplication,
+  getJobApplicationStats,
+  updateApplicationCV
+};

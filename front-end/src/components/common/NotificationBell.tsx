@@ -9,6 +9,7 @@ import {
   deleteNotification,
   type Notification
 } from '../../api/notificationService';
+import { notificationWebSocket } from '../../services/notificationWebSocket';
 import { toast } from 'react-toastify';
 import {
   LuBell,
@@ -37,9 +38,8 @@ const NotificationBell: React.FC = React.memo(() => {
   const [loading, setLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('unread');
   const [isChangingTab, setIsChangingTab] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isTabActiveRef = useRef(true);
   const tabChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch notifications based on filter
@@ -90,52 +90,67 @@ const NotificationBell: React.FC = React.memo(() => {
     }
   }, [activeFilter, isOpen, fetchNotifications]);
 
-  // Track tab visibility for optimized polling
+  // Initialize WebSocket listeners and fetch initial data
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      isTabActiveRef.current = !document.hidden;
-      if (!document.hidden && isOpen) {
-        // Fetch immediately when tab becomes active
-        fetchNotifications(activeFilter, false, true);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [fetchNotifications, activeFilter, isOpen]);
-
-  // Poll for unread count
-  useEffect(() => {
-    const fetchUnreadCount = async () => {
+    // Fetch initial unread count
+    const fetchInitialCount = async () => {
       try {
         const count = await getUnreadCount();
         setUnreadCount(count);
       } catch (error) {
-        console.error('Error fetching unread count:', error);
+        console.error('Error fetching initial unread count:', error);
       }
     };
 
-    fetchUnreadCount();
-    
-    // Poll for new notifications every 30 seconds (only when tab is active)
-    pollIntervalRef.current = setInterval(() => {
-      if (isTabActiveRef.current) {
-        fetchUnreadCount();
-        if (isOpen) {
-          fetchNotifications(activeFilter, false, false); // Don't update count, we just did
+    fetchInitialCount();
+
+    // Handle new notifications
+    const unsubscribeNotification = notificationWebSocket.onNotification((notification) => {
+      console.log('New notification received:', notification);
+      
+      // Update unread count
+      setUnreadCount(prev => prev + 1);
+      
+      // If dropdown is open and on 'all' or 'unread' filter, add to list
+      if (isOpen) {
+        if (activeFilter === 'all' || (activeFilter === 'unread' && !notification.is_read)) {
+          setNotifications(prev => [notification, ...prev]);
         }
       }
-    }, 30000);
-    
+      
+      // Show toast notification
+      toast.info(notification.title, {
+        position: 'top-right',
+        autoClose: 5000,
+      });
+    });
+
+    // Handle connection
+    const unsubscribeConnect = notificationWebSocket.onConnect(() => {
+      console.log('WebSocket connected');
+      setIsConnected(true);
+    });
+
+    // Handle disconnection
+    const unsubscribeDisconnect = notificationWebSocket.onDisconnect(() => {
+      console.log('WebSocket disconnected');
+      setIsConnected(false);
+    });
+
+    // Check initial connection state
+    setIsConnected(notificationWebSocket.isConnected());
+
+    // Cleanup - only unsubscribe listeners, don't disconnect WebSocket
     return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
+      unsubscribeNotification();
+      unsubscribeConnect();
+      unsubscribeDisconnect();
+      
       if (tabChangeTimeoutRef.current) {
         clearTimeout(tabChangeTimeoutRef.current);
       }
     };
-  }, [fetchNotifications, activeFilter, isOpen]);
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -401,12 +416,18 @@ const NotificationBell: React.FC = React.memo(() => {
         onClick={toggleDropdown}
         className="relative p-2 text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg transition-all hover:bg-gray-100 cursor-pointer"
         aria-label="Notifications"
+        title={isConnected ? 'Kết nối WebSocket' : 'Đang kết nối lại...'}
       >
         {unreadCount > 0 ? (
           <LuBellRing className="w-4 h-4 animate-wiggle" />
         ) : (
           <LuBell className="w-4 h-4" />
         )}
+        
+        {/* Connection Status Indicator */}
+        <span className={`absolute bottom-0 right-0 w-2 h-2 rounded-full ${
+          isConnected ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'
+        }`} />
         
         {/* Badge */}
         {unreadBadge}

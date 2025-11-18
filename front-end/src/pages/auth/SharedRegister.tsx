@@ -207,6 +207,7 @@ const SharedRegister: React.FC = () => {
             />
             <button
               type="button"
+              tabIndex={-1}
               onClick={() => setShowPasswords(!showPasswords)}
               className="cursor-pointer absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
             >
@@ -247,6 +248,7 @@ const SharedRegister: React.FC = () => {
             />
             <button
               type="button"
+              tabIndex={-1}
               onClick={() => setShowPasswords(!showPasswords)}
               className="cursor-pointer absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700"
             >

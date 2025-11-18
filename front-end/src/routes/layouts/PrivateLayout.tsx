@@ -156,6 +156,12 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
       placeholder: 'Nhập email'
     },
     {
+      name: 'email_notifications_enabled',
+      label: 'Nhận thông báo qua email',
+      type: 'checkbox' as const,
+      description: 'Bật/tắt nhận thông báo về ứng tuyển, công việc và các cập nhật khác qua email'
+    },
+    {
       name: 'newPassword',
       label: 'Mật khẩu mới',
       type: 'password' as const,
@@ -565,7 +571,8 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
           fields={profileFields}
           initialValues={{
             name: user?.name || '',
-            email: user?.email || ''
+            email: user?.email || '',
+            email_notifications_enabled: user?.email_notifications_enabled ?? true
           }}
           isSubmitting={isProfileSubmitting}
         />)

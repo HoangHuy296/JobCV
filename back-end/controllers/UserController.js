@@ -87,7 +87,7 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, password, is_active, image_id, role_id } = req.body;
+    const { name, email, password, is_active, image_id, role_id, email_notifications_enabled } = req.body;
     
     // Prepare update data
     const updateData = {};
@@ -96,6 +96,7 @@ const updateUser = async (req, res) => {
     if (is_active !== undefined) updateData.is_active = is_active;
     if (image_id !== undefined) updateData.image_id = image_id;
     if (role_id !== undefined) updateData.role_id = role_id;
+    if (email_notifications_enabled !== undefined) updateData.email_notifications_enabled = email_notifications_enabled;
     
     // Hash password if provided
     if (password) {

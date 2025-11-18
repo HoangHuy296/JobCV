@@ -72,6 +72,22 @@ export const downloadCV = async (id: number): Promise<Blob> => {
   return response.data;
 };
 
+// Check if CV is used in job applications
+export const checkCVInApplications = async (id: number): Promise<{
+  isUsed: boolean;
+  applications: Array<{
+    id: number;
+    job_id: number;
+    job_title: string;
+    status: string;
+    recruiter_id: number;
+    recruiter_name: string;
+  }>;
+}> => {
+  const response = await api.get(`/cvs/${id}/check-applications`);
+  return response.data.result;
+};
+
 // Delete a CV
 export const deleteCV = async (id: number): Promise<void> => {
   const response = await api.delete(`/cvs/${id}`);

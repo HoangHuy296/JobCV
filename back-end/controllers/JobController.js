@@ -2,7 +2,7 @@ const Job = require('../models/Job');
 const Company = require('../models/Company');
 const Notification = require('../models/Notification');
 const db = require('../config/db');
-const { validateJob } = require('../validators/jobValidator');
+const { sendJobClosedEmail } = require('../config/nodemailer');
 
 // Create a new job with versioning support
 const createJob = async (req, res) => {
@@ -12,12 +12,6 @@ const createJob = async (req, res) => {
     
     const { title, brief_description, requirement, benefits, salary, date_end_register, years_experienced, work_hours, company_id, industry_id, location, status } = req.body;
     
-    // Validate input
-    const validationErrors = validateJob(req.body);
-    if (validationErrors.length > 0) {
-      return res.status(400).json({ result: null, message: validationErrors.join(', ') });
-    }
-
     // Check if company exists and user has permission
     const company = await Company.findById(company_id);
     if (!company) {
@@ -264,13 +258,9 @@ const updateJob = async (req, res) => {
   });
 };
 
-// Delete job with cascade deletion of all related data
+// Delete job with soft delete
 const deleteJob = async (req, res) => {
-  const connection = await db.getConnection();
-  
   try {
-    await connection.beginTransaction();
-    
     const { id } = req.params;
     
     // Check if job exists
@@ -288,41 +278,22 @@ const deleteJob = async (req, res) => {
       });
     }
     
-    // Delete all related data in the correct order (child tables first)
-    
-    // 1. Delete job reports
-    await connection.query('DELETE FROM job_reports WHERE job_id = ?', [id]);
-    
-    // 2. Delete job likes
-    await connection.query('DELETE FROM job_likes WHERE job_id = ?', [id]);
-    
-    // 3. Delete job reviews (must be deleted before versions)
-    await connection.query('DELETE FROM job_reviews WHERE job_id = ?', [id]);
-    
-    // 4. Delete job versions
-    await connection.query('DELETE FROM job_versions WHERE job_id = ?', [id]);
-    
-    // 5. Finally, delete the job itself (soft delete)
+    // Soft delete the job - related data will be handled by application logic
+    // when querying (filter out jobs where deleted = true)
     const deleted = await Job.delete(id);
     
     if (!deleted) {
-      await connection.rollback();
       return res.status(500).json({
         result: null, message: 'Xóa công việc thất bại'
       });
     }
     
-    await connection.commit();
-    
     res.status(200).json({
       result: { id: parseInt(id) }, message: null
     });
   } catch (error) {
-    await connection.rollback();
     console.error('Error deleting job:', error);
     res.status(500).json({ result: null, message: 'Xóa công việc thất bại' });
-  } finally {
-    connection.release();
   }
 };
 
@@ -674,6 +645,82 @@ const getUserLikedJobs = async (req, res) => {
   }
 };
 
+// Close a job and notify all applicants
+const closeJob = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if job exists
+    const existingJob = await Job.findById(id);
+    if (!existingJob) {
+      return res.status(404).json({
+        result: null, message: 'Không tìm thấy công việc'
+      });
+    }
+    
+    // Check if user is authorized to close this job
+    if (existingJob.created_by !== req.user.id && req.user.role?.name !== 'admin') {
+      return res.status(403).json({
+        result: null, message: 'Bạn không được phép đóng công việc này'
+      });
+    }
+    
+    // Update job to closed status
+    await db.query(
+      'UPDATE jobs SET is_closed = TRUE WHERE id = ?',
+      [id]
+    );
+    
+    // Get all applicants for this job with their email addresses and preferences
+    const [applicants] = await db.query(
+      `SELECT DISTINCT ja.user_id, u.name as user_name, u.email as user_email,
+              u.email_notifications_enabled
+       FROM job_applications ja
+       LEFT JOIN users u ON ja.user_id = u.id
+       WHERE ja.job_id = ? AND ja.status IN ('pending', 'reviewing')`,
+      [id]
+    );
+    
+    // Send notifications and emails to all applicants
+    if (applicants.length > 0) {
+      const notificationWS = req.app.get('notificationWS');
+      
+      for (const applicant of applicants) {
+        // Create notification
+        const notification = await Notification.create({
+          user_id: applicant.user_id,
+          title: 'Công việc đã đóng',
+          message: `Công việc "${existingJob.title}" đã đóng. Đơn ứng tuyển của bạn đang được xem xét.`,
+          type: 'info',
+          link: `/bang-dieu-khien`
+        });
+        
+        // Send WebSocket notification
+        if (notificationWS) {
+          notificationWS.sendToUser(applicant.user_id, notification);
+        }
+        
+        // Send email to applicant (only if they have email notifications enabled)
+        if (applicant.user_email && applicant.email_notifications_enabled) {
+          await sendJobClosedEmail(
+            applicant.user_email,
+            applicant.user_name,
+            existingJob.title
+          );
+        }
+      }
+    }
+    
+    res.status(200).json({
+      result: { id: parseInt(id), is_closed: true }, 
+      message: 'Đóng công việc thành công'
+    });
+  } catch (error) {
+    console.error('Error closing job:', error);
+    res.status(500).json({ result: null, message: 'Đóng công việc thất bại' });
+  }
+};
+
 module.exports = {
   createJob,
   getAllJobs,
@@ -687,5 +734,6 @@ module.exports = {
   checkLikeStatus,
   updateJobStatus,
   getJobPreview,
-  getUserLikedJobs
+  getUserLikedJobs,
+  closeJob
 };

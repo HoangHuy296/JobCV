@@ -3,12 +3,11 @@
  * Controller for managing job versions
  */
 
-const db = require('../config/db');
-const { validateJob } = require('../validators/jobValidator');
 const Job = require('../models/Job');
 const JobVersion = require('../models/JobVersion');
 const JobReview = require('../models/JobReview');
 const User = require('../models/User');
+const db = require('../config/db');
 
 /**
  * Create a new version of a job
@@ -25,12 +24,6 @@ exports.createJobVersion = async (req, res) => {
       date_end_register, years_experienced, work_hours, company_id,
       industry_id, location
     } = req.body;
-
-    // Validate input
-    const validationErrors = validateJob(req.body);
-    if (validationErrors.length > 0) {
-      return res.status(400).json({ result: null, message: validationErrors.join(', ') });
-    }
 
     // Check if job exists and user has permission
     const job = await Job.findById(jobId);

@@ -117,6 +117,16 @@
   body {
     @apply bg-background text-foreground;
   }
+  button,
+  [role='button'],
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'] {
+    @apply cursor-pointer;
+  }
+  a {
+    @apply cursor-pointer;
+  }
 }
 
 /* Custom utility classes */

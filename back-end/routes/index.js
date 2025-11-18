@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { getAllUsers, getUserById, createUser, updateUser, deleteUser, setUserActiveStatus } = require('../controllers/UserController');
 const { getAllRoles, getRoleById, createRole, updateRole, deleteRole } = require('../controllers/RoleController');
-const { login, register, forgotPassword, resetPassword } = require('../controllers/AuthController');
+const { login, register, forgotPassword, resetPassword, verifyEmail, resendVerification } = require('../controllers/AuthController');
+const { getAdminDashboardStats } = require('../controllers/DashboardController');
 const authenticate = require('../middleware/auth');
 
 /**
@@ -617,9 +618,81 @@ router.post('/auth/forgot-password', forgotPassword);
  */
 router.post('/auth/reset-password', resetPassword);
 
+/**
+ * @swagger
+ * /api/auth/verify-email:
+ *   post:
+ *     summary: Verify email address
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *             required:
+ *               - token
+ *     responses:
+ *       200:
+ *         description: Email verified successfully
+ *       400:
+ *         description: Invalid or expired token
+ */
+router.post('/auth/verify-email', verifyEmail);
+
+/**
+ * @swagger
+ * /api/auth/resend-verification:
+ *   post:
+ *     summary: Resend verification email
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *             required:
+ *               - email
+ *     responses:
+ *       200:
+ *         description: Verification email sent
+ *       400:
+ *         description: Email is required or account already activated
+ */
+router.post('/auth/resend-verification', resendVerification);
+
+// Dashboard routes
+/**
+ * @swagger
+ * /api/dashboard/admin/stats:
+ *   get:
+ *     summary: Get admin dashboard statistics
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard statistics retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/dashboard/admin/stats', authenticate, getAdminDashboardStats);
+
 // Job routes
 const jobRoutes = require('./jobs');
 router.use('/jobs', jobRoutes);
+
+// Job Application routes
+const jobApplicationRoutes = require('./jobApplications');
+router.use('/job-applications', jobApplicationRoutes);
 
 // Company routes
 const companyRoutes = require('./companies');
@@ -859,7 +932,5 @@ router.use('/campaigns', campaignRoutes);
 // Notification routes
 const notificationRoutes = require('./notifications');
 router.use('/notifications', notificationRoutes);
-
-// Note: Job Version routes are now included in the jobs.js file
 
 module.exports = router;

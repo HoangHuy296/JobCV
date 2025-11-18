@@ -24,6 +24,7 @@ const CampaignDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showAddJobModal, setShowAddJobModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<number | null>(null);
+  const [selectedJobs, setSelectedJobs] = useState<Set<number>>(new Set());
 
   // Fetch campaign data
   const fetchCampaignData = useCallback(async () => {
@@ -102,6 +103,49 @@ const CampaignDetail: React.FC = () => {
       fetchCampaignData();
     } catch (error) {
       console.error('Error removing job from campaign:', error);
+      toast.error('Lỗi khi xóa tin tuyển dụng');
+    }
+  };
+
+  // Handle toggle job selection
+  const handleToggleJob = (jobId: number) => {
+    const newSelected = new Set(selectedJobs);
+    if (newSelected.has(jobId)) {
+      newSelected.delete(jobId);
+    } else {
+      newSelected.add(jobId);
+    }
+    setSelectedJobs(newSelected);
+  };
+
+  // Handle select all jobs
+  const handleSelectAll = () => {
+    if (selectedJobs.size === campaignJobs.length) {
+      setSelectedJobs(new Set());
+    } else {
+      setSelectedJobs(new Set(campaignJobs.map(j => j.id)));
+    }
+  };
+
+  // Handle bulk remove
+  const handleBulkRemove = async () => {
+    if (!id || selectedJobs.size === 0) return;
+
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${selectedJobs.size} tin tuyển dụng khỏi chiến dịch?`)) {
+      return;
+    }
+
+    try {
+      await Promise.all(
+        Array.from(selectedJobs).map(jobId => 
+          removeJobFromCampaign(parseInt(id), jobId)
+        )
+      );
+      toast.success(`Đã xóa ${selectedJobs.size} tin tuyển dụng khỏi chiến dịch`);
+      setSelectedJobs(new Set());
+      fetchCampaignData();
+    } catch (error) {
+      console.error('Error bulk removing jobs:', error);
       toast.error('Lỗi khi xóa tin tuyển dụng');
     }
   };
@@ -187,7 +231,22 @@ const CampaignDetail: React.FC = () => {
       {/* Jobs List */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Danh sách tin tuyển dụng</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-lg font-semibold text-gray-900">Danh sách tin tuyển dụng</h2>
+            {selectedJobs.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">
+                  {selectedJobs.size} đã chọn
+                </span>
+                <button
+                  onClick={handleBulkRemove}
+                  className="px-3 py-1 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 cursor-pointer"
+                >
+                  Xóa khỏi chiến dịch
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setShowAddJobModal(true)}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer flex items-center gap-2"
@@ -212,6 +271,14 @@ const CampaignDetail: React.FC = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={campaignJobs.length > 0 && selectedJobs.size === campaignJobs.length}
+                      onChange={handleSelectAll}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tiêu đề</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngành nghề</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vị trí</th>
@@ -222,6 +289,14 @@ const CampaignDetail: React.FC = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {campaignJobs.map((job) => (
                   <tr key={job.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedJobs.has(job.id)}
+                        onChange={() => handleToggleJob(job.id)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{job.title}</div>
                     </td>

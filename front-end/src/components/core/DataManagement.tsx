@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import GenericTable from './GenericTable';
 import SlideOver from '../common/SlideOver';
+import ConfirmModal from '../common/ConfirmModal';
 import type { FormField } from '../common/SlideOver';
 
 type Column<T> = {
@@ -69,6 +70,8 @@ const DataManagement = <T extends { id: number }>({
   const [showModal, setShowModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<T | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<T | null>(null);
 
   const handleEdit = (record: T) => {
     setEditingRecord(record);
@@ -125,17 +128,29 @@ const DataManagement = <T extends { id: number }>({
     }
   };
 
-  const handleDeleteClick = async (record: T) => {
+  const handleDeleteClick = (record: T) => {
+    setRecordToDelete(record);
+    setShowConfirmDelete(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!recordToDelete || !onDelete) return;
+    
     setIsSubmitting(true);
     try {
-      if (onDelete && window.confirm(`Bạn có chắc chắn muốn xóa ${title.toLowerCase()} này?`)) {
-        await onDelete(record);
-      }
+      await onDelete(recordToDelete);
+      setShowConfirmDelete(false);
+      setRecordToDelete(null);
     } catch (error) {
       console.error('Error deleting record:', error);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCancelDelete = () => {
+    setShowConfirmDelete(false);
+    setRecordToDelete(null);
   };
 
   return (
@@ -345,6 +360,19 @@ const DataManagement = <T extends { id: number }>({
         onSubmit={handleSubmit}
         isSubmitting={isSubmitting}
         keepFormDataOnSubmit={true}
+      />
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={showConfirmDelete}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        title="Xác nhận xóa"
+        message={`Bạn có chắc chắn muốn xóa ${title.toLowerCase()} này? Hành động này không thể hoàn tác.`}
+        confirmText="Xóa"
+        cancelText="Hủy"
+        type="danger"
+        isLoading={isSubmitting}
       />
     </>
   );

@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useDebounce } from '../../hooks/useDebounce';
 
 export interface Option {
   value: any;
@@ -16,7 +17,34 @@ interface SelectWithSearchProps {
   error?: string;
 }
 
-const SelectWithSearch: React.FC<SelectWithSearchProps> = ({
+// Memoized option item component
+const OptionItem = React.memo(({ 
+  option, 
+  isSelected, 
+  multiple, 
+  onToggle 
+}: { 
+  option: Option; 
+  isSelected: boolean; 
+  multiple: boolean; 
+  onToggle: (value: any) => void;
+}) => (
+  <div 
+    className="px-3 py-2 flex items-center hover:bg-gray-100 cursor-pointer"
+    onClick={() => onToggle(option.value)}
+  >
+    <input
+      type={multiple ? "checkbox" : "radio"}
+      checked={isSelected}
+      onChange={() => {}}
+      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+    />
+    <span className="ml-2 text-sm text-gray-700 truncate">{option.label}</span>
+  </div>
+));
+OptionItem.displayName = 'OptionItem';
+
+const SelectWithSearch: React.FC<SelectWithSearchProps> = React.memo(({
   options,
   selectedValues: rawSelectedValues,
   onChange,
@@ -27,17 +55,23 @@ const SelectWithSearch: React.FC<SelectWithSearchProps> = ({
   error = ''
 }) => {
   // Ensure selectedValues is always an array
-  const selectedValues = Array.isArray(rawSelectedValues) ? rawSelectedValues : (rawSelectedValues ? [rawSelectedValues] : []);
+  const selectedValues = useMemo(() => 
+    Array.isArray(rawSelectedValues) ? rawSelectedValues : (rawSelectedValues ? [rawSelectedValues] : []),
+    [rawSelectedValues]
+  );
+  
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // Filter options based on search term
+  // Filter options based on debounced search term
   const filteredOptions = useMemo(() => {
+    if (!debouncedSearchTerm) return options;
     return options.filter(option =>
-      option.label.toLowerCase().includes(searchTerm.toLowerCase())
+      option.label.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
     );
-  }, [options, searchTerm]);
+  }, [options, debouncedSearchTerm]);
   
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -57,7 +91,7 @@ const SelectWithSearch: React.FC<SelectWithSearchProps> = ({
   }, [isOpen]);
   
   // Handle option selection
-  const handleOptionToggle = (value: any) => {
+  const handleOptionToggle = useCallback((value: any) => {
     if (multiple) {
       const isSelected = selectedValues.some(v => v === value || (v == value));
       const newSelectedValues = isSelected
@@ -70,7 +104,7 @@ const SelectWithSearch: React.FC<SelectWithSearchProps> = ({
       onChange([value]);
       setIsOpen(false);
     }
-  };
+  }, [multiple, selectedValues, onChange]);
   
   // Handle select all
   const handleSelectAll = () => {
@@ -192,19 +226,13 @@ const SelectWithSearch: React.FC<SelectWithSearchProps> = ({
           <div className="py-1 overflow-y-auto flex-grow">
             {filteredOptions.length > 0 ? (
               filteredOptions.map((option: Option) => (
-                <div 
-                  key={option.value} 
-                  className="px-3 py-2 flex items-center hover:bg-gray-100 cursor-pointer"
-                  onClick={() => handleOptionToggle(option.value)}
-                >
-                  <input
-                    type={multiple ? "checkbox" : "radio"}
-                    checked={selectedValues.some(v => v === option.value || (v == option.value))}
-                    onChange={() => {}} // Handled by parent div click
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700 truncate">{option.label}</span>
-                </div>
+                <OptionItem
+                  key={option.value}
+                  option={option}
+                  isSelected={selectedValues.some(v => v === option.value || (v == option.value))}
+                  multiple={multiple}
+                  onToggle={handleOptionToggle}
+                />
               ))
             ) : (
               <div className="px-3 py-2 text-sm text-gray-500">Không tìm thấy kết quả</div>
@@ -214,6 +242,8 @@ const SelectWithSearch: React.FC<SelectWithSearchProps> = ({
       )}
     </div>
   );
-};
+});
+
+SelectWithSearch.displayName = 'SelectWithSearch';
 
 export default SelectWithSearch;

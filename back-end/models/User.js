@@ -241,6 +241,56 @@ class User {
     }
   }
 
+  // Create email verification token
+  static async createEmailVerificationToken(userId, token, expiresAt) {
+    try {
+      const query = 'INSERT INTO email_verification_tokens (user_id, token, expires_at) VALUES (?, ?, ?)';
+      const [result] = await db.query(query, [userId, token, expiresAt]);
+      return result.insertId;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Find valid email verification token
+  static async findValidEmailVerificationToken(token) {
+    try {
+      const query = `
+        SELECT evt.*, u.email, u.name
+        FROM email_verification_tokens evt
+        JOIN users u ON evt.user_id = u.id
+        WHERE evt.token = ? AND evt.expires_at > NOW() AND evt.used = FALSE AND u.deleted_at IS NULL AND u.deleted = FALSE
+      `;
+      
+      const [rows] = await db.query(query, [token]);
+      return rows[0];
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Mark email verification token as used
+  static async markEmailVerificationTokenAsUsed(tokenId) {
+    try {
+      const query = 'UPDATE email_verification_tokens SET used = TRUE WHERE id = ?';
+      const [result] = await db.query(query, [tokenId]);
+      return result.affectedRows > 0;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Activate user account
+  static async activateAccount(userId) {
+    try {
+      const query = 'UPDATE users SET is_active = TRUE WHERE id = ? AND deleted_at IS NULL AND deleted = FALSE';
+      const [result] = await db.query(query, [userId]);
+      return result.affectedRows > 0;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Find users with pagination and filtering
   static async findWithPagination(filters = {}, limit = 10, offset = 0) {
     try {

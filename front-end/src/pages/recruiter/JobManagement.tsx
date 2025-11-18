@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
 import { useIndustryContext } from '../../contexts/IndustryContext';
-import { getAllJobs, createJob, updateJob, deleteJob, type Job } from '../../api/jobService';
+import { getAllJobs, createJob, deleteJob, closeJob, type Job } from '../../api/jobService';
 import { submitJobForReview, cancelJobReview } from '../../api/jobReviewService';
 import { getJobVersions, setVersionLive, setPrimaryVersion, createJobVersion, updateJobVersion, deleteJobVersion, type JobVersion } from '../../api/jobVersionService';
 import { toast } from 'react-toastify';
 import { DataManagement } from '../../components';
 import SelectWithSearch from '../../components/common/SelectWithSearch';
 import JobVersionsModal from '../../components/common/JobVersionsModal';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 // Extended job type for the edit form
 interface JobForEdit extends Omit<Job, 'industry_id'> {
@@ -28,6 +29,10 @@ const JobManagement: React.FC = () => {
   const [showVersionsModal, setShowVersionsModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobForEdit | null>(null);
   const [versions, setVersions] = useState<JobVersion[]>([]);
+  
+  // Close job modal state
+  const [showCloseJobModal, setShowCloseJobModal] = useState(false);
+  const [jobToClose, setJobToClose] = useState<JobForEdit | null>(null);
 
   // Pagination and filtering state
   const [currentPage, setCurrentPage] = useState(1);
@@ -69,7 +74,7 @@ const JobManagement: React.FC = () => {
         page, 
         pagination.limit, 
         reset ? '' : searchTerm,
-        reset ? '' : company?.id?.toString(), // company filter
+        company?.id?.toString(), // Always filter by recruiter's company
         '', // location parameter
         reset ? '' : industryFilter,
         filters
@@ -229,6 +234,14 @@ const JobManagement: React.FC = () => {
     
     try {
       setLoading(true);
+      
+      // Check if job has a current version
+      if (!updatedJob.current_version_id) {
+        toast.error('Không tìm thấy phiên bản hiện tại của tin tuyển dụng');
+        setLoading(false);
+        return;
+      }
+      
       // Handle industry_id which could be a number, string, or array
       let industryId = updatedJob.industry_id;
       
@@ -240,16 +253,11 @@ const JobManagement: React.FC = () => {
       // Ensure we have a number
       industryId = typeof industryId === 'string' ? parseInt(industryId) : industryId;
       
-      // Determine status based on is_published checkbox and current status
-      let status = updatedJob.status;
-      if (updatedJob.is_published && status === 'draft') {
-        status = 'pending_review';
-      } else if (!updatedJob.is_published && (status === 'pending_review' || status === 'rejected')) {
-        status = 'draft';
-      }
+      // Get current status
+      const currentStatus = updatedJob.version_status || updatedJob.status;
       
-      // Update the job with the new data
-      const resp = await updateJob(updatedJob.id, {
+      // Update the current version instead of creating a new one
+      const resp = await updateJobVersion(updatedJob.id, updatedJob.current_version_id, {
         title: updatedJob.title,
         brief_description: updatedJob.brief_description,
         requirement: updatedJob.requirement,
@@ -260,15 +268,23 @@ const JobManagement: React.FC = () => {
         work_hours: updatedJob.work_hours || '',
         company_id: (company?.id || 0), // For recruiter, use their own ID as company_id
         industry_id: industryId,
-        location: updatedJob.location || '',
-        status: status
+        location: updatedJob.location || ''
       });
       
       if (resp) {
         let message = 'Cập nhật tin tuyển dụng thành công';
-        if (updatedJob.is_published && updatedJob.status === 'draft') {
-          message += '& Tin tuyển dụng đã được gửi đi phê duyệt!';
+        
+        // Handle status changes based on is_published checkbox
+        if (updatedJob.is_published && (currentStatus === 'draft' || currentStatus === 'rejected')) {
+          // Submit for review if user wants to publish
+          await submitJobForReview(updatedJob.id);
+          message += ' & Tin tuyển dụng đã được gửi đi phê duyệt!';
+        } else if (!updatedJob.is_published && currentStatus === 'pending_review') {
+          // Cancel review if user unchecks publish
+          await cancelJobReview(updatedJob.id);
+          message += ' & Đã hủy yêu cầu phê duyệt!';
         }
+        
         toast.success(message);
         fetchJobs();
       }
@@ -295,6 +311,34 @@ const JobManagement: React.FC = () => {
       toast.error('Lỗi khi xóa tin tuyển dụng');
       setLoading(false); // Make sure to reset loading state on error
     }
+  };
+  
+  // Handle close job click
+  const handleCloseJobClick = (job: JobForEdit) => {
+    setJobToClose(job);
+    setShowCloseJobModal(true);
+  };
+  
+  // Handle confirm close job
+  const handleConfirmCloseJob = async () => {
+    if (!jobToClose) return;
+    
+    try {
+      await closeJob(jobToClose.id);
+      toast.success('Đóng tin tuyển dụng thành công');
+      setShowCloseJobModal(false);
+      setJobToClose(null);
+      fetchJobs();
+    } catch (error) {
+      console.error('Error closing job:', error);
+      toast.error('Lỗi khi đóng tin tuyển dụng');
+    }
+  };
+  
+  // Handle cancel close job
+  const handleCancelCloseJob = () => {
+    setShowCloseJobModal(false);
+    setJobToClose(null);
   };
   
   // Function to navigate to the public job detail page
@@ -609,6 +653,19 @@ const JobManagement: React.FC = () => {
       required: true,
       placeholder: 'Nhập vị trí'
     },
+    {
+      name: 'max_applicants',
+      label: 'Số lượng ứng viên tối đa',
+      type: 'number' as const,
+      placeholder: 'Để trống nếu không giới hạn',
+      description: 'Số lượng ứng viên tối đa có thể ứng tuyển vào công việc này'
+    },
+    {
+      name: 'auto_close_on_threshold',
+      label: 'Tự động đóng khi đạt ngưỡng',
+      type: 'checkbox' as const,
+      description: 'Tự động đóng tin tuyển dụng khi đạt số lượng ứng viên tối đa. Bạn sẽ luôn nhận được thông báo và email khi đạt ngưỡng.'
+    },
   ], []);
 
   // Memoized pagination data
@@ -639,7 +696,9 @@ const JobManagement: React.FC = () => {
       // Convert industry_id to array format for IndustrySelect
       industry_id: [job.industry_id],
       // Set is_published based on status
-      is_published: job.status === 'pending_review' || job.status === 'approved'
+      is_published: job.status === 'pending_review' || job.status === 'approved',
+      // Ensure threshold fields have default values
+      auto_close_on_threshold: job.auto_close_on_threshold || false
     })) as JobForEdit[];
   }, [jobs]);
 
@@ -733,6 +792,17 @@ const JobManagement: React.FC = () => {
               });
             }
             
+            // Add Close Job action if job is approved and not already closed
+            if (currentStatus === 'approved' && !job.is_closed) {
+              actions.push({
+                label: 'Đóng tin tuyển dụng',
+                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+                onClick: () => handleCloseJobClick(job),
+                className: 'text-orange-600 hover:text-orange-800 cursor-pointer',
+                type: 'default'
+              });
+            }
+            
             return actions;
           }
         }}
@@ -749,6 +819,18 @@ const JobManagement: React.FC = () => {
         onCreateNewVersion={handleCreateNewVersion}
         onUpdateVersion={handleUpdateVersion}
         onDeleteVersion={handleDeleteVersion}
+      />
+      
+      {/* Close Job Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showCloseJobModal}
+        onClose={handleCancelCloseJob}
+        onConfirm={handleConfirmCloseJob}
+        title="Xác nhận đóng tin tuyển dụng"
+        message={`Bạn có chắc chắn muốn đóng tin tuyển dụng "${jobToClose?.title}"?\n\nSau khi đóng:\n- Ứng viên không thể ứng tuyển vào tin này nữa\n- Tất cả ứng viên đang chờ xét duyệt sẽ được thông báo\n- Nếu muốn mở lại, bạn sẽ phải gửi phê duyệt lại`}
+        confirmText="Đóng tin tuyển dụng"
+        cancelText="Hủy"
+        type="warning"
       />
     </>
   );

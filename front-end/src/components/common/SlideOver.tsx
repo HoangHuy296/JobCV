@@ -3,6 +3,7 @@ import SelectWithSearch from './SelectWithSearch';
 import LocationSelect from './LocationSelect';
 import IndustrySelect from './IndustrySelect';
 import QuillEditor from './QuillEditor';
+import { getMediaUrl } from '../../utils/mediaUtils';
 
 interface SlideOverProps {
   title: string;
@@ -382,7 +383,13 @@ const SlideOver: React.FC<SlideOverProps> = ({
                                 <div className="mt-2">
                                   <label className="block text-sm font-medium text-gray-700 mb-1">Image Preview</label>
                                   <img 
-                                    src={(formData[field.name] && typeof formData[field.name] === 'string' && !formData[field.name].startsWith('blob:')) ? formData[field.name] : imagePreviews[field.name]} 
+                                    src={
+                                      imagePreviews[field.name] 
+                                        ? imagePreviews[field.name] 
+                                        : (formData[field.name] && typeof formData[field.name] === 'string' && !formData[field.name].startsWith('blob:'))
+                                          ? (getMediaUrl(formData[field.name]) || formData[field.name])
+                                          : ''
+                                    } 
                                     alt="Preview" 
                                     className="h-32 w-32 object-cover rounded-md border border-gray-300"
                                     onError={(e) => {

@@ -1,7 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
-const { sendPasswordResetEmail, sendWelcomeEmail } = require('../config/nodemailer');
+const { sendPasswordResetEmail, sendWelcomeEmail, sendEmailVerificationEmail } = require('../config/nodemailer');
 require('dotenv').config();
 
 // Login user
@@ -23,7 +23,11 @@ const login = async (req, res) => {
     
     // Check if user is active
     if (!user.is_active) {
-      return res.status(401).json({ result: null, message: 'Tài khoản đã bị vô hiệu hóa' });
+      return res.status(403).json({ 
+        result: null, 
+        message: 'Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email để xác thực tài khoản.',
+        code: 'ACCOUNT_NOT_ACTIVATED'
+      });
     }
     
     // Verify password
@@ -102,29 +106,37 @@ const register = async (req, res) => {
     // Hash the password
     const hashedPassword = await User.hashPassword(password);
     
-    // Create new user with default active status and role
+    // Create new user with inactive status (requires email verification) and role
     const userData = { 
       name, 
       email, 
       password: hashedPassword, 
-      is_active: true,
+      is_active: false,
       role_id: roleId
     };
     
-    await User.create(userData);
+    const newUser = await User.create(userData);
     
-    // Send welcome email
+    // Generate verification token
+    const crypto = require('crypto');
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 86400000); // 24 hours from now
+    
+    // Save verification token to database
+    await User.createEmailVerificationToken(newUser.id, verificationToken, expiresAt);
+    
+    // Send verification email
     try {
-      await sendWelcomeEmail(email, name);
-      console.log(`Welcome email sent to ${email}`);
+      await sendEmailVerificationEmail(email, verificationToken, name);
+      console.log(`Verification email sent to ${email}`);
     } catch (emailError) {
-      console.error('Error sending welcome email:', emailError);
-      // Continue even if email fails - registration is still successful
+      console.error('Error sending verification email:', emailError);
+      // Continue even if email fails - user can request resend
     }
     
     res.status(201).json({
       result: true,
-      message: null
+      message: 'Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.'
     });
   } catch (error) {
     console.error('Error during registration:', error);
@@ -228,9 +240,97 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// Verify email
+const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    // Validate input
+    if (!token) {
+      return res.status(400).json({ result: null, message: 'Token xác thực là bắt buộc' });
+    }
+    
+    // Find valid verification token
+    const verificationToken = await User.findValidEmailVerificationToken(token);
+    
+    if (!verificationToken) {
+      return res.status(400).json({ result: null, message: 'Token xác thực không hợp lệ hoặc đã hết hạn' });
+    }
+    
+    // Activate user account
+    await User.activateAccount(verificationToken.user_id);
+    
+    // Mark token as used
+    await User.markEmailVerificationTokenAsUsed(verificationToken.id);
+    
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(verificationToken.email, verificationToken.name);
+      console.log(`Welcome email sent to ${verificationToken.email}`);
+    } catch (emailError) {
+      console.error('Error sending welcome email:', emailError);
+      // Continue even if email fails
+    }
+    
+    res.json({ result: true, message: 'Xác thực email thành công! Bạn có thể đăng nhập ngay bây giờ.' });
+  } catch (error) {
+    console.error('Error during email verification:', error);
+    res.status(500).json({ result: null, message: 'Xác thực email thất bại' });
+  }
+};
+
+// Resend verification email
+const resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    // Validate input
+    if (!email) {
+      return res.status(400).json({ result: null, message: 'Email là bắt buộc' });
+    }
+    
+    // Find user by email
+    const user = await User.findByEmail(email);
+    
+    if (!user) {
+      // For security reasons, we don't reveal if the email exists
+      return res.json({ result: true, message: 'Nếu email tồn tại, một email xác thực mới đã được gửi.' });
+    }
+    
+    // Check if user is already active
+    if (user.is_active) {
+      return res.status(400).json({ result: null, message: 'Tài khoản đã được kích hoạt' });
+    }
+    
+    // Generate new verification token
+    const crypto = require('crypto');
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 86400000); // 24 hours from now
+    
+    // Save verification token to database
+    await User.createEmailVerificationToken(user.id, verificationToken, expiresAt);
+    
+    // Send verification email
+    try {
+      await sendEmailVerificationEmail(user.email, verificationToken, user.name);
+      console.log(`Verification email resent to ${user.email}`);
+    } catch (emailError) {
+      console.error('Error sending verification email:', emailError);
+      return res.status(500).json({ result: null, message: 'Không thể gửi email xác thực' });
+    }
+    
+    res.json({ result: true, message: 'Email xác thực đã được gửi lại. Vui lòng kiểm tra hộp thư của bạn.' });
+  } catch (error) {
+    console.error('Error during resend verification:', error);
+    res.status(500).json({ result: null, message: 'Gửi lại email xác thực thất bại' });
+  }
+};
+
 module.exports = {
   login,
   register,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  verifyEmail,
+  resendVerification
 };

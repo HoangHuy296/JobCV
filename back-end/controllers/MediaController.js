@@ -1,9 +1,9 @@
 const Media = require('../models/Media');
 const Setting = require('../models/Setting');
+const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
-const multer = require('multer');
 const { promisify } = require('util');
 
 // Cache for settings to reduce database queries
@@ -128,13 +128,20 @@ const uploadMedia = async (req, res) => {
     const relativePath = path.relative(uploadsDir, req.file.path);
     const dateFolder = path.dirname(relativePath);
     
+    // Generate full URL with protocol and host
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const baseUrl = `${protocol}://${host}`;
+    const relativeUrl = `/uploads/${dateFolder}/${req.file.filename}`;
+    const fullUrl = `${baseUrl}${relativeUrl}`;
+    
     const mediaData = {
       filename: req.file.filename,
       original_name: req.file.originalname,
       mime_type: req.file.mimetype,
       size: req.file.size,
       path: req.file.path,
-      url: `/uploads/${dateFolder}/${req.file.filename}`,
+      url: fullUrl,
       storage_type: 'local',
       created_by: req.user ? req.user.id : null
     };
@@ -238,6 +245,55 @@ const deleteMedia = async (req, res) => {
   }
 };
 
+// Create media record from external URL
+const createMediaFromUrl = async (req, res) => {
+  try {
+    const { url, original_name } = req.body;
+    
+    if (!url || typeof url !== 'string' || url.trim() === '') {
+      return res.status(400).json({ 
+        result: null, 
+        message: 'URL is required' 
+      });
+    }
+    
+    // Validate URL format
+    try {
+      new URL(url);
+    } catch (urlError) {
+      return res.status(400).json({ 
+        result: null, 
+        message: 'Invalid URL format' 
+      });
+    }
+    
+    const mediaData = {
+      filename: original_name || 'external-image',
+      original_name: original_name || url.split('/').pop() || 'external-image',
+      mime_type: 'image/external',
+      size: 0,
+      path: url,
+      url: url,
+      storage_type: 'external',
+      created_by: req.user ? req.user.id : null
+    };
+    
+    const mediaId = await Media.create(mediaData);
+    mediaData.id = mediaId;
+    
+    res.status(200).json({
+      result: mediaData,
+      message: null
+    });
+  } catch (error) {
+    console.error('Error creating media from URL:', error);
+    res.status(500).json({ 
+      result: null, 
+      message: 'Lỗi khi tạo media từ URL' 
+    });
+  }
+};
+
 // Function to clear settings cache (useful for testing or when settings change)
 const clearSettingsCache = () => {
   settingsCache.clear();
@@ -248,6 +304,7 @@ module.exports = {
   upload,
   createUploadMiddleware,
   uploadMedia,
+  createMediaFromUrl,
   getMediaById,
   deleteMedia,
   clearSettingsCache // Export for potential use in tests or admin functions

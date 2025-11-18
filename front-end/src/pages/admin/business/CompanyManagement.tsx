@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAllCompanies, createCompany, updateCompany, deleteCompany, type Company, type CreateCompanyData } from '../../../api/companyService';
-import { uploadMedia } from '../../../api/mediaService';
+import { uploadMedia, createMediaFromUrl } from '../../../api/mediaService';
 import { toast } from 'react-toastify';
 import { DataManagement } from '../../../components';
 import { useIndustryContext } from '../../../contexts/IndustryContext';
 import SelectWithSearch from '../../../components/common/SelectWithSearch';
+import { getLogoUrl } from '../../../utils/mediaUtils';
 
 const CompanyManagementRefactored: React.FC = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -140,6 +141,15 @@ const CompanyManagementRefactored: React.FC = () => {
         }
       } else if (typeof values.logo === 'number') {
         logoId = values.logo;
+      } else if (typeof values.logo === 'string' && values.logo.trim() !== '') {
+        // If logo is a URL string, create a media record from the URL
+        try {
+          const mediaResponse = await createMediaFromUrl(values.logo);
+          logoId = mediaResponse.id;
+        } catch (urlError) {
+          console.error('Error creating media from URL:', urlError);
+          toast.error('Không thể tạo logo từ URL. Vui lòng kiểm tra URL.');
+        }
       }
       
       const companyData: CreateCompanyData = {
@@ -190,6 +200,15 @@ const CompanyManagementRefactored: React.FC = () => {
         }
       } else if (typeof (updatedCompany as any).logo === 'number') {
         logoId = (updatedCompany as any).logo;
+      } else if (typeof (updatedCompany as any).logo === 'string' && (updatedCompany as any).logo.trim() !== '') {
+        // If logo is a URL string, create a media record from the URL
+        try {
+          const mediaResponse = await createMediaFromUrl((updatedCompany as any).logo);
+          logoId = mediaResponse.id;
+        } catch (urlError) {
+          console.error('Error creating media from URL:', urlError);
+          toast.error('Không thể tạo logo từ URL. Vui lòng kiểm tra URL.');
+        }
       }
       
       // Update the company with the new industries array
@@ -241,13 +260,16 @@ const CompanyManagementRefactored: React.FC = () => {
     { 
       key: 'logo_url' as keyof Company, 
       title: 'Logo',
-      render: (_value: any, record: Company) => record?.logo?.url ? (
-        <img src={record.logo.url} alt={record.name} className="h-10 w-10 object-contain" />
-      ) : (
-        <div className="h-10 w-10 bg-gray-200 rounded flex items-center justify-center">
-          <span className="text-gray-500 text-xs">Không có</span>
-        </div>
-      )
+      render: (_value: any, record: Company) => {
+        const logoUrl = getLogoUrl(record?.logo);
+        return logoUrl ? (
+          <img src={logoUrl} alt={record.name} className="h-10 w-10 object-contain" />
+        ) : (
+          <div className="h-10 w-10 bg-gray-200 rounded flex items-center justify-center">
+            <span className="text-gray-500 text-xs">Không có</span>
+          </div>
+        );
+      }
     },
     { key: 'name' as keyof Company, title: 'Tên công ty' },
     { 

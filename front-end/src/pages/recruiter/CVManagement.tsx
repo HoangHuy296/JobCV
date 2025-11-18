@@ -69,18 +69,6 @@ const RecruiterCVManagement: React.FC = () => {
     }
   }, [searchTerm]);
 
-  const handleCreate = useCallback(async () => {
-    // CVs are typically uploaded, not created through a form
-    // This function is required by DataManagement but not used for CVs
-    toast.info('Vui lòng sử dụng chức năng tải lên để thêm CV mới');
-  }, []);
-
-  const handleEdit = useCallback(async () => {
-    // CVs are typically not edited directly
-    // This function is required by DataManagement but not used for CVs
-    toast.info('Chức năng chỉnh sửa CV chưa được hỗ trợ');
-  }, []);
-
   const handleDelete = useCallback(async (cv: CV) => {
     try {
       await deleteCV(cv.id);
@@ -150,8 +138,6 @@ const RecruiterCVManagement: React.FC = () => {
       columns={columns}
       formFields={formFields}
       loading={loading}
-      onCreate={handleCreate}
-      onEdit={handleEdit}
       onDelete={handleDelete}
       onRefresh={() => fetchCVs(currentPage)}
       pagination={
@@ -173,6 +159,11 @@ const RecruiterCVManagement: React.FC = () => {
           onFilter: () => fetchCVs(currentPage, false)
         }
       }
+      action={{
+        showAddAction: false,
+        showEditAction: false,
+        showDeleteAction: true
+      }}
     />
   );
 };
