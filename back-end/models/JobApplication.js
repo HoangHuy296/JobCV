@@ -67,12 +67,14 @@ class JobApplication {
           ja.*,
           u.name as user_name,
           u.email as user_email,
-          u.image as user_image,
+          u.image_id as user_image_id,
+          m.url as user_image_url,
           cv.title as cv_title,
           cv.file_path as cv_file_path
         FROM job_applications ja
         LEFT JOIN users u ON ja.user_id = u.id
         LEFT JOIN cvs cv ON ja.cv_id = cv.id
+        LEFT JOIN media m ON u.image_id = m.id
         WHERE ja.job_id = ?
       `;
       const params = [jobId];

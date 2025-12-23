@@ -44,6 +44,8 @@ export interface Job {
   liked_at?: string;
   // Company object from API
   company?: Company;
+  // Application count
+  application_count?: number;
 }
 
 export interface CreateJobData {
@@ -116,6 +118,12 @@ export const getAllJobs = async (
 export const getJobById = async (id: number): Promise<Job> => {
   const response = await api.get(`/jobs/${id}`);
   return response.data.result;
+};
+
+// Get recruiter's jobs with application counts
+export const getRecruiterJobs = async (): Promise<{ jobs: Job[] }> => {
+  const response = await api.get('/jobs/user/my-jobs?limit=1000');
+  return { jobs: response.data.result.jobs || [] };
 };
 
 // Update job - now creates a new version

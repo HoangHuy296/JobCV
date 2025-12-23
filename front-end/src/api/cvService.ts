@@ -11,6 +11,8 @@ export interface CV {
   mime_type?: string;
   content?: any;
   is_template: boolean;
+  template_id?: number;
+  template_data?: any;
   created_at: string;
   modified_at: string;
   deleted_at: string | null;

@@ -261,7 +261,7 @@ const getJobApplications = async (req, res) => {
     const status = req.query.status || null;
 
     // Check if user has permission to view applications
-    const userRole = req.user.role;
+    const userRole = req.user.role.name;
     if (userRole !== 'admin' && userRole !== 'recruiter') {
       return res.status(403).json({
         result: null,
@@ -313,7 +313,7 @@ const getApplicationById = async (req, res) => {
     }
 
     // Check permissions
-    const userRole = req.user.role;
+    const userRole = req.user.role.name;
     const userId = req.user.id;
 
     if (userRole === 'user' && application.user_id !== userId) {
@@ -367,7 +367,7 @@ const updateApplicationStatus = async (req, res) => {
     }
 
     // Check permissions
-    const userRole = req.user.role;
+    const userRole = req.user.role.name;
     if (userRole !== 'admin' && userRole !== 'recruiter') {
       return res.status(403).json({
         result: null,
@@ -464,7 +464,7 @@ const getJobApplicationStats = async (req, res) => {
     const { id } = req.params;
 
     // Check permissions
-    const userRole = req.user.role;
+    const userRole = req.user.role.name;
     if (userRole !== 'admin' && userRole !== 'recruiter') {
       return res.status(403).json({
         result: null,

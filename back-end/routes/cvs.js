@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { getAllCVs, getUserCVs, uploadCV, downloadCV, deleteCV, checkCVInApplications } = require('../controllers/CVController');
 const authenticate = require('../middleware/auth');
+const optionalAuth = require('../middleware/optionalAuth');
 
 // Middleware to check admin role
 const requireAdmin = (req, res, next) => {
@@ -219,7 +220,7 @@ router.post('/', authenticate, upload.single('file'), uploadCV);
  *       500:
  *         description: Server error
  */
-router.get('/:id', authenticate, downloadCV);
+router.get('/:id', optionalAuth, downloadCV);
 
 /**
  * @swagger

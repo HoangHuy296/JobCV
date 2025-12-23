@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { LuSearch, LuEye, LuArrowRight, LuX } from 'react-icons/lu';
+import { LuSearch, LuEye, LuArrowRight, LuX, LuSave, LuLoader, LuFileText, LuSparkles } from 'react-icons/lu';
 import {
   getPublishedTemplates,
-  getTemplatePreview
+  getTemplatePreview,
+  createCVFromTemplate,
+  getCVForEdit,
+  updateCVFromTemplate
 } from '../../api/cvTemplateService';
 import { getActiveSections, getTemplateSections, type CVSection } from '../../api/cvSectionService';
-import UnifiedCVEditor from './UnifiedCVEditor';
+import UserCVEditor from './UserCVEditor';
 
 interface CVTemplate {
   id: number;
@@ -24,9 +27,10 @@ interface TemplateSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void; // Callback to refresh CV list
+  editingCvId?: number | null; // CV ID to edit
 }
 
-const TemplateSelectionModal: React.FC<TemplateSelectionModalProps> = ({ isOpen, onClose, onSuccess }) => {
+const TemplateSelectionModal: React.FC<TemplateSelectionModalProps> = ({ isOpen, onClose, onSuccess, editingCvId }) => {
   const navigate = useNavigate();
   const [templates, setTemplates] = useState<CVTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,9 +52,33 @@ const TemplateSelectionModal: React.FC<TemplateSelectionModalProps> = ({ isOpen,
 
   useEffect(() => {
     if (isOpen) {
-      fetchTemplates();
+      if (editingCvId) {
+        loadCVForEdit();
+      } else {
+        fetchTemplates();
+      }
     }
-  }, [isOpen, page, searchTerm]);
+  }, [isOpen, page, searchTerm, editingCvId]);
+
+  const loadCVForEdit = async () => {
+    try {
+      setLoading(true);
+      const response = await getCVForEdit(editingCvId!);
+      const { cv, template, sections, userData } = response.data;
+      
+      setEditingTemplate(template);
+      setTemplateSections(sections);
+      setUserData(userData);
+      setCvTitle(cv.title);
+      setShowEditor(true);
+    } catch (error: any) {
+      console.error('Error loading CV for edit:', error);
+      toast.error(error.response?.data?.message || 'Không thể tải CV');
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchTemplates = async () => {
     try {
@@ -122,7 +150,7 @@ const TemplateSelectionModal: React.FC<TemplateSelectionModalProps> = ({ isOpen,
       setAvailableSections(availableResponse.data || []);
       
       setUserData({});
-      setCvTitle('');
+      setCvTitle(`CV từ ${templateResponse.data.name}`);
       setIsPublic(false);
       setShowEditor(true);
     } catch (error) {
@@ -130,6 +158,51 @@ const TemplateSelectionModal: React.FC<TemplateSelectionModalProps> = ({ isOpen,
       toast.error('Không thể tải template');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveCV = async () => {
+    if (!cvTitle.trim()) {
+      toast.error('Vui lòng nhập tiêu đề CV');
+      return;
+    }
+
+    if (!editingTemplate) {
+      toast.error('Không tìm thấy template');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      
+      if (editingCvId) {
+        // Update existing CV
+        await updateCVFromTemplate(editingCvId, {
+          title: cvTitle,
+          data: userData
+        });
+        toast.success('Cập nhật CV thành công!');
+      } else {
+        // Create new CV
+        await createCVFromTemplate({
+          template_id: editingTemplate.id,
+          title: cvTitle,
+          data: userData
+        });
+        toast.success('Tạo CV thành công!');
+      }
+      
+      setShowEditor(false);
+      onClose();
+      
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error: any) {
+      console.error('Error saving CV:', error);
+      toast.error(error.response?.data?.message || 'Không thể lưu CV');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -190,7 +263,7 @@ const TemplateSelectionModal: React.FC<TemplateSelectionModalProps> = ({ isOpen,
                 {templates.map((template) => (
                   <div
                     key={template.id}
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-200 group"
+                    className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-200 group flex flex-col"
                   >
                     {/* Template Preview Image */}
                     <div className="w-full h-56 bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
@@ -223,7 +296,7 @@ const TemplateSelectionModal: React.FC<TemplateSelectionModalProps> = ({ isOpen,
                     </div>
 
                     {/* Template Info */}
-                    <div className="p-6">
+                    <div className="p-6 flex flex-col flex-1">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
                           <h3 className="text-lg font-semibold text-gray-900 mb-1">
@@ -243,7 +316,7 @@ const TemplateSelectionModal: React.FC<TemplateSelectionModalProps> = ({ isOpen,
 
                       <button
                         onClick={() => handleUseTemplate(template.id)}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors mt-auto"
                       >
                         Sử dụng template
                         <LuArrowRight className="w-5 h-5" />
@@ -346,6 +419,79 @@ const TemplateSelectionModal: React.FC<TemplateSelectionModalProps> = ({ isOpen,
                 Sử dụng template
                 <LuArrowRight className="w-5 h-5" />
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Editor Modal */}
+      {showEditor && editingTemplate && (
+        <div className="fixed inset-0 z-[60] overflow-hidden">
+          <div className="absolute inset-0 bg-black opacity-70"></div>
+          
+          <div className="fixed inset-0 flex items-center justify-center p-4">
+            <div className="relative bg-white shadow-xl w-full h-full max-w-[95vw] max-h-[95vh] flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <LuSparkles className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm text-gray-600">Đang sử dụng template: <span className="font-semibold text-gray-900">{editingTemplate.name}</span></span>
+                  </div>
+                  <input
+                    type="text"
+                    value={cvTitle}
+                    onChange={(e) => setCvTitle(e.target.value)}
+                    placeholder="Nhập tiêu đề CV của bạn"
+                    className="w-full max-w-lg px-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSaveCV}
+                    disabled={saving}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                  >
+                    {saving ? (
+                      <>
+                        <LuLoader className="w-4 h-4 animate-spin" />
+                        Đang lưu...
+                      </>
+                    ) : (
+                      <>
+                        <LuSave className="w-4 h-4" />
+                        Lưu CV
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (editingCvId) {
+                        // If editing, close the entire modal
+                        setShowEditor(false);
+                        onClose();
+                      } else {
+                        // If creating new, go back to template selection
+                        setShowEditor(false);
+                      }
+                    }}
+                    className="p-2 hover:bg-gray-200 rounded transition-colors"
+                    title="Đóng"
+                  >
+                    <LuX className="w-5 h-5 text-gray-600" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Editor */}
+              <div className="flex-1 overflow-hidden">
+                <UserCVEditor
+                  templateImage={editingTemplate.thumbnail_url || ''}
+                  sections={templateSections}
+                  userData={userData}
+                  onUserDataChange={setUserData}
+                />
+              </div>
             </div>
           </div>
         </div>

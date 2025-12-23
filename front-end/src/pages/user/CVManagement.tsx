@@ -13,7 +13,8 @@ import {
   LuCalendar,
   LuX,
   LuPlus,
-  LuEye
+  LuEye,
+  LuPencil
 } from 'react-icons/lu';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import TemplateSelectionModal from '../../components/cv/TemplateSelectionModal';
@@ -49,6 +50,7 @@ const CVManagement: React.FC = () => {
   const [imagePreviewModal, setImagePreviewModal] = useState(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [editingCvId, setEditingCvId] = useState<number | null>(null);
 
   const fetchCVs = useCallback(async (page: number = 1, search: string = '') => {
     try {
@@ -147,13 +149,38 @@ const CVManagement: React.FC = () => {
     }
   };
 
+  const handlePreview = (cv: CV) => {
+    if (cv.template_id) {
+      // Open preview page for template-based CVs
+      window.open(`/cv/preview/${cv.id}`, '_blank');
+    } else {
+      toast.info('Preview chỉ khả dụng cho CV từ template');
+    }
+  };
+
   const handleDownload = async (cv: CV) => {
     try {
       const blob = await downloadCV(cv.id);
+      
+      // Check if response is actually a blob (not JSON error)
+      if (blob.type === 'application/json') {
+        const text = await blob.text();
+        const error = JSON.parse(text);
+        toast.error(error.message || 'Không thể tải xuống CV');
+        return;
+      }
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = cv.file_name || `${cv.title}.pdf`;
+      
+      // Set proper filename based on CV type
+      if (cv.template_id) {
+        a.download = `${cv.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+      } else {
+        a.download = cv.file_name || `${cv.title}.pdf`;
+      }
+      
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -237,6 +264,11 @@ const CVManagement: React.FC = () => {
       setPreviewImageUrl(cv.file_url);
       setImagePreviewModal(true);
     }
+  };
+
+  const handleEditCV = (cvId: number) => {
+    setEditingCvId(cvId);
+    setShowTemplateModal(true);
   };
 
   return (
@@ -379,13 +411,33 @@ const CVManagement: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col gap-2 mt-auto">
-                  <button
-                    onClick={() => handleDownload(cv)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer font-medium"
-                  >
-                    <LuDownload className="w-4 h-4" />
-                    Tải xuống
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleDownload(cv)}
+                      className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer font-medium text-sm"
+                    >
+                      <LuDownload className="w-4 h-4" />
+                      Tải xuống
+                    </button>
+                    {cv.template_id && (
+                      <button
+                        onClick={() => handlePreview(cv)}
+                        className="flex items-center justify-center gap-2 px-3 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors cursor-pointer font-medium text-sm"
+                      >
+                        <LuEye className="w-4 h-4" />
+                        Xem trước
+                      </button>
+                    )}
+                  </div>
+                  {cv.template_id && (
+                    <button
+                      onClick={() => handleEditCV(cv.id)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer font-medium"
+                    >
+                      <LuPencil className="w-4 h-4" />
+                      Chỉnh sửa
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDeleteClick(cv.id)}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer font-medium"
@@ -599,8 +651,15 @@ const CVManagement: React.FC = () => {
       {/* Template Selection Modal */}
       <TemplateSelectionModal
         isOpen={showTemplateModal}
-        onClose={() => setShowTemplateModal(false)}
-        onSuccess={() => fetchCVs(currentPage, searchTerm)}
+        onClose={() => {
+          setShowTemplateModal(false);
+          setEditingCvId(null);
+        }}
+        onSuccess={() => {
+          fetchCVs(currentPage, searchTerm);
+          setEditingCvId(null);
+        }}
+        editingCvId={editingCvId}
       />
     </div>
   );

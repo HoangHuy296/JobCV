@@ -16,13 +16,13 @@ import CompanyDetail from '../pages/public/CompanyDetail';
 import JobListing from '../pages/public/JobListing';
 import JobDetail from '../pages/public/JobDetail';
 import JobPreview from '../pages/public/JobPreview';
+import CVPreview from '../pages/public/CVPreview';
 import NotFound from '../pages/public/NotFound';
 // User pages
 import UserDashboard from '../pages/user/UserDashboard';
 import LikedJobs from '../pages/user/LikedJobs';
 import SubscribedCompanies from '../pages/user/SubscribedCompanies';
 import CVManagement from '../pages/user/CVManagement';
-import CreateCVFromTemplate from '../pages/user/CreateCVFromTemplate';
 import MyApplications from '../pages/user/MyApplications';
 // Admin pages
 import * as Admin from '../pages/admin';
@@ -33,7 +33,8 @@ import RecruiterCVManagement from '../pages/recruiter/CVManagement';
 import CompanyManage from '../pages/recruiter/company/CompanyManage';
 import CampaignManagement from '../pages/recruiter/campaign/CampaignManagement';
 import CampaignDetail from '../pages/recruiter/campaign/CampaignDetail';
-import JobApplications from '../pages/recruiter/JobApplications';
+import JobApplications from '../pages/recruiter/job/JobApplications';
+import CVApplicationsManagement from '../pages/recruiter/CVApplicationsManagement';
 
 // Layout wrappers for nested routes
 const PublicLayoutWrapper: React.FC = () => (
@@ -79,6 +80,7 @@ const AppRouter: React.FC = () => {
           <Route path="/viec-lam" element={<JobListing />} />
           <Route path="/viec-lam/:id" element={<JobDetail />} />
           <Route path="/viec-lam/preview/:id" element={<JobPreview />} />
+          <Route path="/cv/preview/:cvId" element={<CVPreview />} />
         </Route>
 
         {/* User routes */}
@@ -93,7 +95,6 @@ const AppRouter: React.FC = () => {
           <Route path="/cong-viec-da-thich" element={<LikedJobs />} />
           <Route path="/cong-ty-theo-doi" element={<SubscribedCompanies />} />
           <Route path="/quan-ly-cv" element={<CVManagement />} />
-          <Route path="/tao-cv-tu-template/:templateId" element={<CreateCVFromTemplate />} />
           <Route path="/don-ung-tuyen" element={<MyApplications />} />
         </Route>
 
@@ -109,6 +110,7 @@ const AppRouter: React.FC = () => {
           <Route path="/nha-tuyen-dung/quan-ly-cong-ty" element={<CompanyManage />} />
           <Route path="/nha-tuyen-dung/quan-ly-tin-tuyen-dung" element={<RecruiterJobManagement />} />
           <Route path="/nha-tuyen-dung/quan-ly-tin-tuyen-dung/:jobId/ung-vien" element={<JobApplications />} />
+          <Route path="/nha-tuyen-dung/quan-ly-cv-ung-tuyen" element={<CVApplicationsManagement />} />
           <Route path="/nha-tuyen-dung/quan-ly-chien-dich" element={<CampaignManagement />} />
           <Route path="/nha-tuyen-dung/chien-dich/:id" element={<CampaignDetail />} />
           <Route path="/nha-tuyen-dung/quan-ly-cv" element={<RecruiterCVManagement />} />

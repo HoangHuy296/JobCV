@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
- const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
 const CVTemplateController = require('../controllers/CVTemplateController');
 const authenticate = require('../middleware/auth');
+const optionalAuth = require('../middleware/optionalAuth');
 
 // Configure multer for template image uploads
 const storage = multer.diskStorage({
@@ -107,6 +108,48 @@ router.get('/categories', CVTemplateController.getCategories);
  */
 router.get('/:id/preview', CVTemplateController.getTemplatePreview);
 
+/**
+ * @swagger
+ * /api/cv-templates/cv/:cvId/preview-data:
+ *   get:
+ *     summary: Lấy data CV để preview (public)
+ *     tags: [CV Templates]
+ *     parameters:
+ *       - in: path
+ *         name: cvId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: CV ID
+ *     responses:
+ *       200:
+ *         description: CV preview data
+ *       404:
+ *         description: Không tìm thấy CV
+ */
+router.get('/cv/:cvId/preview-data', optionalAuth, CVTemplateController.getCVPreviewData);
+
+/**
+ * @swagger
+ * /api/cv-templates/cv/:cvId/preview:
+ *   get:
+ *     summary: Preview CV từ template HTML (user)
+ *     tags: [CV Templates]
+ *     parameters:
+ *       - in: path
+ *         name: cvId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: CV ID
+ *     responses:
+ *       200:
+ *         description: HTML preview của CV
+ *       404:
+ *         description: Không tìm thấy CV
+ */
+router.get('/cv/:cvId/preview', authenticate, CVTemplateController.previewCV);
+
 // Apply authentication middleware to protected routes
 router.use(authenticate);
 
@@ -164,6 +207,27 @@ router.post('/upload-image', authenticate, upload.single('image'), CVTemplateCon
  *         description: Template không tồn tại
  */
 router.post('/create-cv', CVTemplateController.createCVFromTemplate);
+
+/**
+ * @swagger
+ * /api/cv-templates/cv/{cvId}:
+ *   get:
+ *     summary: Lấy thông tin CV để edit (user)
+ *     tags: [CV Templates]
+ *     parameters:
+ *       - in: path
+ *         name: cvId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: CV ID
+ *     responses:
+ *       200:
+ *         description: Thông tin CV
+ *       404:
+ *         description: Không tìm thấy CV
+ */
+router.get('/cv/:cvId', CVTemplateController.getCVForEdit);
 
 /**
  * @swagger

@@ -16,7 +16,7 @@ import {
   removeTemplateSection,
   type CVSection 
 } from '../../../api/cvSectionService';
-import UnifiedCVEditor from '../../../components/cv/UnifiedCVEditor';
+import AdminCVEditor from '../../../components/cv/AdminCVEditor';
 
 interface Template {
   id: number;
@@ -278,19 +278,12 @@ const AdminCVTemplateManagement: React.FC = () => {
           <div className="px-6 py-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setShowEditor(false)}
-                  className="flex items-center gap-2 p-2 border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-all hover:border-gray-400 font-medium text-gray-700"
-                  title="Quay lại"
-                >
-                  <LuArrowLeft className="w-5 h-5" />
-                </button>
                 <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
                   <LuImage className="w-7 h-7 text-white" />
                 </div>
                 <div>
                   <h2 className="text-3xl font-bold text-gray-900">
-                    {editingTemplate ? 'Chễnh sửa Template' : 'Tạo Template Mới'}
+                    {editingTemplate ? 'Chỉnh sửa Template' : 'Tạo Template Mới'}
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">
                     {editingTemplate ? 'Cập nhật thông tin và các mục của template' : 'Upload ảnh template và thêm các mục'}
@@ -305,6 +298,13 @@ const AdminCVTemplateManagement: React.FC = () => {
                 >
                   <LuSave className="w-5 h-5" />
                   <span>{saving ? 'Đang lưu...' : 'Lưu Template'}</span>
+                </button>
+                <button
+                  onClick={() => setShowEditor(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  title="Đóng"
+                >
+                  <LuX className="w-6 h-6 text-gray-500" />
                 </button>
               </div>
             </div>
@@ -419,18 +419,17 @@ const AdminCVTemplateManagement: React.FC = () => {
 
         {/* Editor Section */}
         <div className="flex-1 overflow-hidden">
-          <div className="h-full px-6 pb-6 pt-6">
+          <div className="min-h-[600px] h-full pt-6">
             <div className="h-full bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
               {templateImage ? (
-                <UnifiedCVEditor
+                <AdminCVEditor
                   templateImage={templateImage}
                   sections={templateSections}
                   onSectionsChange={setTemplateSections}
-                  mode="admin"
                   availableSections={availableSections}
                 />
               ) : (
-                <div className="flex items-center justify-center h-full bg-gradient-to-br from-gray-50 to-gray-100">
+                <div className="min-h-[600px] flex items-center justify-center h-full bg-gradient-to-br from-gray-50 to-gray-100">
                   <div className="text-center">
                     <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
                       <LuImage className="w-12 h-12 text-blue-400" />

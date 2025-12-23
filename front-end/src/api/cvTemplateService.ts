@@ -48,6 +48,18 @@ export const updateCVFromTemplate = async (id: number, updateData: {
   return response.data;
 };
 
+// Lấy thông tin CV để edit
+export const getCVForEdit = async (cvId: number) => {
+  const response = await apiClient.get(`/cv-templates/cv/${cvId}`);
+  return response.data;
+};
+
+// Lấy data CV để preview (public)
+export const getCVPreviewData = async (cvId: number) => {
+  const response = await apiClient.get(`/cv-templates/cv/${cvId}/preview-data`);
+  return response.data;
+};
+
 // ============ ADMIN APIs ============
 
 // Upload hình ảnh template (admin)

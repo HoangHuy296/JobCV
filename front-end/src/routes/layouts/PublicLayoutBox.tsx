@@ -128,8 +128,9 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
             { name: 'Danh sách công ty', path: '/cong-ty', category: 'dashboard2' },
             { name: 'Tin tuyển dụng', path: '/viec-lam', category: 'dashboard3' },
             { name: 'Quản lý công ty', path: '/nha-tuyen-dung/quan-ly-cong-ty', category: 'business' },
-            { name: 'Quản lý tin tuyển dụng', path: '/nha-tuyen-dung/quan-ly-cong-viec', category: 'business' },
-            { name: 'Quản lý chiến dịch', path: '/nha-tuyen-dung/quan-ly-chien-dich', category: 'business' },
+            { name: 'Quản lý tin tuyển dụng', path: '/nha-tuyen-dung/quan-ly-tin-tuyen-dung', category: 'business' },
+            { name: 'Quản lý CV ứng tuyển', path: '/nha-tuyen-dung/quan-ly-cv-ung-tuyen', category: 'business' },
+            // { name: 'Quản lý chiến dịch', path: '/nha-tuyen-dung/quan-ly-chien-dich', category: 'business' },
           ];
           break;
         case 'user':

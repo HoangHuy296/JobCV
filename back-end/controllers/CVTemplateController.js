@@ -453,15 +453,397 @@ class CVTemplateController {
     }
   }
   
+  // Get CV preview data (for public preview page)
+  static async getCVPreviewData(req, res) {
+    try {
+      const { cvId } = req.params;
+      const userId = req.user?.id; // Optional - allow authenticated access
+      
+      // Get CV details
+      const [cvs] = await pool.query(
+        `SELECT * FROM cvs WHERE id = ? AND deleted = FALSE`,
+        [cvId]
+      );
+      
+      if (cvs.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy CV'
+        });
+      }
+      
+      const cv = cvs[0];
+      
+      // Allow access if user is authenticated (no role check needed)
+      // This allows recruiters, admins, and CV owners to view CVs
+      
+      // Get template info
+      let template = null;
+      if (cv.template_id) {
+        template = await CVTemplate.getById(cv.template_id);
+      }
+      
+      // Get section data
+      const [sections] = await pool.query(
+        `SELECT 
+          cvs.section_id,
+          cvs.data,
+          cvs.position,
+          cvs.is_visible,
+          cvs.display_order,
+          s.name,
+          s.key_name,
+          s.icon,
+          s.default_fields
+         FROM cv_user_sections cvs
+         LEFT JOIN cv_sections s ON cvs.section_id = s.id
+         WHERE cvs.cv_id = ?
+         ORDER BY cvs.display_order ASC`,
+        [cvId]
+      );
+      
+      // Parse JSON fields
+      const parsedSections = sections.map(section => ({
+        ...section,
+        data: typeof section.data === 'string' ? JSON.parse(section.data) : section.data,
+        position: typeof section.position === 'string' ? JSON.parse(section.position) : section.position,
+        default_fields: typeof section.default_fields === 'string' ? JSON.parse(section.default_fields) : section.default_fields
+      }));
+      
+      res.json({
+        success: true,
+        data: {
+          cv: {
+            id: cv.id,
+            title: cv.title,
+            created_at: cv.created_at
+          },
+          template,
+          sections: parsedSections
+        }
+      });
+    } catch (error) {
+      console.error('Error getting CV preview data:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi khi lấy thông tin CV',
+        error: error.message
+      });
+    }
+  }
+  
+  // Preview CV từ template (user)
+  static async previewCV(req, res) {
+    try {
+      const { cvId } = req.params;
+      const userId = req.user.id;
+      
+      // Get CV details
+      const [cvs] = await pool.query(
+        `SELECT * FROM cvs WHERE id = ? AND user_id = ? AND deleted = FALSE`,
+        [cvId, userId]
+      );
+      
+      if (cvs.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy CV'
+        });
+      }
+      
+      const cv = cvs[0];
+      
+      // Get template info
+      let template = null;
+      if (cv.template_id) {
+        template = await CVTemplate.getById(cv.template_id);
+      }
+      
+      // Get section data
+      const [sections] = await pool.query(
+        `SELECT 
+          cvs.section_id,
+          cvs.data,
+          cvs.position,
+          cvs.is_visible,
+          cvs.display_order,
+          s.name,
+          s.key_name,
+          s.icon,
+          s.default_fields
+         FROM cv_user_sections cvs
+         LEFT JOIN cv_sections s ON cvs.section_id = s.id
+         WHERE cvs.cv_id = ?
+         ORDER BY cvs.display_order ASC`,
+        [cvId]
+      );
+      
+      // Parse JSON fields
+      const parsedSections = sections.map(section => ({
+        ...section,
+        data: typeof section.data === 'string' ? JSON.parse(section.data) : section.data,
+        position: typeof section.position === 'string' ? JSON.parse(section.position) : section.position,
+        default_fields: typeof section.default_fields === 'string' ? JSON.parse(section.default_fields) : section.default_fields
+      }));
+      
+      // Generate HTML preview
+      let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${cv.title}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              background: #f5f5f5;
+              padding: 20px;
+            }
+            .container {
+              max-width: 210mm;
+              min-height: 297mm;
+              margin: 0 auto;
+              background: white;
+              box-shadow: 0 0 20px rgba(0,0,0,0.1);
+              position: relative;
+            }
+            .template-bg {
+              position: absolute;
+              inset: 0;
+              background-image: url('${template?.thumbnail_url || ''}');
+              background-size: contain;
+              background-position: top center;
+              background-repeat: no-repeat;
+              opacity: 0.15;
+              pointer-events: none;
+            }
+            .content {
+              position: relative;
+              z-index: 1;
+            }
+            .section {
+              position: absolute;
+              padding: 10px;
+            }
+            .section-header {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              margin-bottom: 12px;
+              padding-bottom: 8px;
+              border-bottom: 2px solid #2563eb;
+            }
+            .section-title {
+              font-weight: bold;
+              font-size: 14px;
+              color: #1f2937;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            .field {
+              margin-bottom: 8px;
+            }
+            .field-label {
+              font-size: 11px;
+              font-weight: 600;
+              color: #6b7280;
+              text-transform: uppercase;
+              margin-bottom: 4px;
+            }
+            .field-value {
+              font-size: 12px;
+              line-height: 1.6;
+              color: #1f2937;
+              word-break: break-word;
+            }
+            .field-image {
+              width: 120px;
+              height: 120px;
+              object-fit: cover;
+              border-radius: 8px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+              border: 2px solid #e5e7eb;
+            }
+            @media print {
+              body { background: white; padding: 0; }
+              .container { box-shadow: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="template-bg"></div>
+            <div class="content">
+      `;
+      
+      // Add sections
+      parsedSections.forEach(section => {
+        if (!section.is_visible) return;
+        
+        const hasData = section.data && Object.keys(section.data).length > 0;
+        if (!hasData) return;
+        
+        const pos = section.position || { x: 0, y: 0, width: 100, height: 20 };
+        
+        html += `
+          <div class="section" style="left: ${pos.x}%; top: ${pos.y}%; width: ${pos.width}%; min-height: ${pos.height}%;">
+            <div class="section-header">
+              <div class="section-title">${section.name}</div>
+            </div>
+        `;
+        
+        // Add fields
+        if (section.default_fields && section.default_fields.fields) {
+          section.default_fields.fields.forEach(field => {
+            const value = section.data[field.id];
+            if (!value || value === '<p><br></p>') return;
+            
+            if (field.type === 'image') {
+              html += `
+                <div class="field">
+                  <img src="${value}" alt="${field.label}" class="field-image" />
+                </div>
+              `;
+            } else {
+              html += `
+                <div class="field">
+                  <div class="field-label">${field.label}</div>
+                  <div class="field-value">${value}</div>
+                </div>
+              `;
+            }
+          });
+        }
+        
+        html += `</div>`;
+      });
+      
+      html += `
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    } catch (error) {
+      console.error('Error previewing CV:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi khi xem trước CV',
+        error: error.message
+      });
+    }
+  }
+  
+  // Lấy thông tin CV để edit (user)
+  static async getCVForEdit(req, res) {
+    try {
+      const { cvId } = req.params;
+      const userId = req.user.id;
+      
+      // Get CV details
+      const [cvs] = await pool.query(
+        `SELECT * FROM cvs WHERE id = ? AND user_id = ? AND deleted = FALSE`,
+        [cvId, userId]
+      );
+      
+      if (cvs.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy CV'
+        });
+      }
+      
+      const cv = cvs[0];
+      
+      // Get template info if it's a template-based CV
+      let template = null;
+      if (cv.template_id) {
+        template = await CVTemplate.getById(cv.template_id);
+      }
+      
+      // Get section data
+      const [sections] = await pool.query(
+        `SELECT 
+          cvs.section_id,
+          cvs.data,
+          cvs.position,
+          cvs.is_visible,
+          cvs.display_order,
+          s.name,
+          s.key_name,
+          s.description,
+          s.icon,
+          s.default_fields,
+          s.category
+         FROM cv_user_sections cvs
+         LEFT JOIN cv_sections s ON cvs.section_id = s.id
+         WHERE cvs.cv_id = ?
+         ORDER BY cvs.display_order ASC`,
+        [cvId]
+      );
+      
+      // Parse JSON fields
+      const parsedSections = sections.map(section => ({
+        section: {
+          id: section.section_id,
+          name: section.name,
+          key_name: section.key_name,
+          description: section.description,
+          icon: section.icon,
+          default_fields: typeof section.default_fields === 'string' ? JSON.parse(section.default_fields) : section.default_fields,
+          category: section.category
+        },
+        position: typeof section.position === 'string' ? JSON.parse(section.position) : section.position,
+        is_visible: section.is_visible,
+        display_order: section.display_order,
+        data: typeof section.data === 'string' ? JSON.parse(section.data) : section.data
+      }));
+      
+      // Build userData object from sections
+      const userData = {};
+      parsedSections.forEach(section => {
+        if (section.data) {
+          userData[section.section.id] = section.data;
+        }
+      });
+      
+      res.json({
+        success: true,
+        data: {
+          cv,
+          template,
+          sections: parsedSections,
+          userData
+        }
+      });
+    } catch (error) {
+      console.error('Error getting CV for edit:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi khi lấy thông tin CV',
+        error: error.message
+      });
+    }
+  }
+  
   // Cập nhật CV từ template (user)
   static async updateCVFromTemplate(req, res) {
+    const connection = await pool.getConnection();
+    
     try {
+      await connection.beginTransaction();
+      
       const { id } = req.params;
-      const { title, template_data } = req.body;
+      const { title, data } = req.body;
       const userId = req.user.id;
       
       // Check CV exists and belongs to user
-      const [cvs] = await pool.query(
+      const [cvs] = await connection.query(
         `SELECT * FROM cvs WHERE id = ? AND user_id = ? AND deleted = FALSE`,
         [id, userId]
       );
@@ -473,43 +855,69 @@ class CVTemplateController {
         });
       }
       
-      const updateFields = [];
-      const updateValues = [];
-      
+      // Update CV title
       if (title !== undefined) {
-        updateFields.push('title = ?');
-        updateValues.push(title);
+        await connection.query(
+          `UPDATE cvs SET title = ?, template_data = ? WHERE id = ? AND user_id = ?`,
+          [title, JSON.stringify(data || {}), id, userId]
+        );
       }
       
-      if (template_data !== undefined) {
-        updateFields.push('template_data = ?');
-        updateValues.push(JSON.stringify(template_data));
+      // Update section data
+      if (data && typeof data === 'object') {
+        // Delete existing section data
+        await connection.query(
+          `DELETE FROM cv_user_sections WHERE cv_id = ?`,
+          [id]
+        );
+        
+        // Insert updated section data
+        const sectionEntries = Object.entries(data);
+        for (const [sectionId, sectionData] of sectionEntries) {
+          if (sectionData && Object.keys(sectionData).length > 0) {
+            // Get section info for position
+            const [sectionInfo] = await connection.query(
+              `SELECT ts.position, ts.is_visible, ts.display_order
+               FROM cv_template_sections ts
+               WHERE ts.template_id = (SELECT template_id FROM cvs WHERE id = ?)
+               AND ts.section_id = ?`,
+              [id, sectionId]
+            );
+            
+            if (sectionInfo.length > 0) {
+              await connection.query(
+                `INSERT INTO cv_user_sections (cv_id, section_id, position, data, is_visible, display_order)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [
+                  id,
+                  sectionId,
+                  JSON.stringify(sectionInfo[0].position || { x: 0, y: 0, width: 100, height: 20 }),
+                  JSON.stringify(sectionData),
+                  sectionInfo[0].is_visible !== false,
+                  sectionInfo[0].display_order || 0
+                ]
+              );
+            }
+          }
+        }
       }
       
-      if (updateFields.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Không có dữ liệu để cập nhật'
-        });
-      }
-      
-      updateValues.push(id, userId);
-      
-      await pool.query(
-        `UPDATE cvs SET ${updateFields.join(', ')} WHERE id = ? AND user_id = ?`,
-        updateValues
-      );
+      await connection.commit();
       
       res.json({
-        success: true
+        success: true,
+        message: 'Cập nhật CV thành công'
       });
     } catch (error) {
+      await connection.rollback();
       console.error('Error updating CV from template:', error);
       res.status(500).json({
         success: false,
         message: 'Lỗi khi cập nhật CV',
         error: error.message
       });
+    } finally {
+      connection.release();
     }
   }
   

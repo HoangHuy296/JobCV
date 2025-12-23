@@ -3,6 +3,7 @@ const Notification = require('../models/Notification');
 const path = require('path');
 const fs = require('fs').promises;
 const db = require('../config/db');
+const { generateCVPDF } = require('../utils/pdfGenerator');
 
 // Get all CVs for admin with pagination and filtering
 const getAllCVs = async (req, res) => {
@@ -220,9 +221,20 @@ const uploadCV = async (req, res) => {
 const downloadCV = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.user?.id; // Optional for public access
     
-    const cv = await CV.getByIdAndUserId(id, userId);
+    // Get CV - allow public access for template-based CVs
+    let cv;
+    if (userId) {
+      cv = await CV.getByIdAndUserId(id, userId);
+    } else {
+      // For public access, get CV without user check
+      const [cvs] = await db.query(
+        'SELECT * FROM cvs WHERE id = ? AND deleted_at IS NULL AND deleted = FALSE',
+        [id]
+      );
+      cv = cvs.length > 0 ? cvs[0] : null;
+    }
     
     if (!cv) {
       return res.status(404).json({ result: null, message: 'Không tìm thấy CV' });
@@ -232,6 +244,56 @@ const downloadCV = async (req, res) => {
       return res.status(404).json({ result: null, message: 'Không tìm thấy CV' });
     }
     
+    // Check access permission
+    if (userId && cv.user_id !== userId && !cv.is_published) {
+      return res.status(403).json({ result: null, message: 'Bạn không có quyền tải CV này' });
+    }
+    
+    // Check if this is a template-based CV
+    if (cv.template_id) {
+      console.log('Generating PDF for template-based CV:', id);
+      
+      // Get section data for this CV
+      const [sections] = await db.query(
+        `SELECT 
+          cvs.section_id,
+          cvs.data,
+          cvs.position,
+          cvs.is_visible,
+          cvs.display_order,
+          s.name as section_name,
+          s.key_name,
+          s.icon
+         FROM cv_user_sections cvs
+         LEFT JOIN cv_sections s ON cvs.section_id = s.id
+         WHERE cvs.cv_id = ?
+         ORDER BY cvs.display_order ASC`,
+        [id]
+      );
+      
+      // Parse JSON fields
+      const parsedSections = sections.map(section => ({
+        ...section,
+        data: typeof section.data === 'string' ? JSON.parse(section.data) : section.data,
+        position: typeof section.position === 'string' ? JSON.parse(section.position) : section.position
+      }));
+      
+      // Generate PDF
+      const pdfDoc = generateCVPDF(cv, parsedSections);
+      
+      // Set headers for PDF download
+      const filename = `${cv.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      // Pipe PDF to response
+      pdfDoc.pipe(res);
+      pdfDoc.end();
+      
+      return;
+    }
+    
+    // For regular uploaded CVs
     if (!cv.file_path) {
       return res.status(404).json({ result: null, message: 'Không tìm thấy tệp CV' });
     }
@@ -259,7 +321,9 @@ const downloadCV = async (req, res) => {
     });
   } catch (error) {
     console.error('Error downloading CV:', error);
-    res.status(500).json({ result: null, message: 'Tải xuống CV thất bại' });
+    if (!res.headersSent) {
+      res.status(500).json({ result: null, message: 'Tải xuống CV thất bại' });
+    }
   }
 };
 
