@@ -4,6 +4,75 @@ const path = require('path');
 const fs = require('fs').promises;
 const db = require('../config/db');
 
+// Get all CVs for admin with pagination and filtering
+const getAllCVs = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
+    const offset = (page - 1) * limit;
+    
+    const filters = {};
+    if (search) {
+      filters.search = search;
+    }
+    
+    // Get CVs with user information
+    let query = `
+      SELECT 
+        cvs.*,
+        users.name as user_name,
+        users.email as user_email
+      FROM cvs
+      LEFT JOIN users ON cvs.user_id = users.id
+      WHERE cvs.deleted_at IS NULL AND cvs.deleted = FALSE
+    `;
+    const values = [];
+    
+    if (search) {
+      query += ' AND (cvs.title LIKE ? OR users.name LIKE ? OR users.email LIKE ?)';
+      values.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    
+    query += ' ORDER BY cvs.created_at DESC LIMIT ? OFFSET ?';
+    values.push(limit, offset);
+    
+    const [cvs] = await db.query(query, values);
+    const total = await CV.count(filters);
+    
+    // Add full URL to each CV
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const baseUrl = `${protocol}://${host}`;
+    
+    const cvsWithUrl = cvs.map(cv => {
+      if (cv.file_path) {
+        const uploadsIndex = cv.file_path.indexOf('uploads');
+        const relativePath = uploadsIndex !== -1 ? cv.file_path.substring(uploadsIndex) : cv.file_path;
+        cv.file_url = `${baseUrl}/${relativePath.replace(/\\/g, '/')}`;
+      }
+      return cv;
+    });
+    
+    res.json({
+      success: true,
+      data: cvsWithUrl,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching all CVs:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Lỗi khi lấy danh sách CV' 
+    });
+  }
+};
+
 // Get all CVs for the current user with pagination and filtering
 const getUserCVs = async (req, res) => {
   try {
@@ -21,9 +90,24 @@ const getUserCVs = async (req, res) => {
     const cvs = await CV.findWithPagination(filters, limit, offset);
     const total = await CV.count(filters);
     
+    // Add full URL to each CV
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const baseUrl = `${protocol}://${host}`;
+    
+    const cvsWithUrl = cvs.map(cv => {
+      if (cv.file_path) {
+        // Extract relative path from absolute path
+        const uploadsIndex = cv.file_path.indexOf('uploads');
+        const relativePath = uploadsIndex !== -1 ? cv.file_path.substring(uploadsIndex) : cv.file_path;
+        cv.file_url = `${baseUrl}/${relativePath.replace(/\\/g, '/')}`;
+      }
+      return cv;
+    });
+    
     res.json({
       result: {
-        cvs: cvs,
+        cvs: cvsWithUrl,
         pagination: {
           page,
           limit,
@@ -84,6 +168,17 @@ const uploadCV = async (req, res) => {
       });
     }
     
+    // Generate full URL with protocol and host (like Media controller)
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const baseUrl = `${protocol}://${host}`;
+    
+    // Extract relative path from absolute path
+    const uploadsIndex = req.file.path.indexOf('uploads');
+    const relativePath = uploadsIndex !== -1 ? req.file.path.substring(uploadsIndex) : req.file.path;
+    const relativeUrl = `/${relativePath.replace(/\\/g, '/')}`;
+    const fullUrl = `${baseUrl}${relativeUrl}`;
+    
     const cvData = {
       user_id: userId,
       title,
@@ -93,10 +188,19 @@ const uploadCV = async (req, res) => {
       mime_type: req.file.mimetype
     };
     
-    const newCV = await CV.create(cvData);
+    const cvId = await CV.create(cvData);
+    
+    // Return CV data with full URL (like Media controller)
+    const responseData = {
+      id: cvId,
+      ...cvData,
+      file_url: fullUrl,
+      file_path: undefined // Don't expose absolute path
+    };
     
     res.status(201).json({
-      result: { cv: { ...newCV, file_path: undefined } }, message: null
+      result: { cv: responseData }, 
+      message: null
     });
   } catch (error) {
     console.error('Error uploading CV:', error);
@@ -280,6 +384,7 @@ const deleteCV = async (req, res) => {
 };
 
 module.exports = {
+  getAllCVs,
   getUserCVs,
   uploadCV,
   downloadCV,

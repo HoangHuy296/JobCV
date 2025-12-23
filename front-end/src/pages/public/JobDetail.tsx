@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { getJobById, likeJob, unlikeJob, checkLikeStatus, type Job } from '../../api/jobService';
+import { useParams, useNavigate } from 'react-router-dom';
+import { parseDate, formatDate, isPastDate } from '../../utils/dateUtils';
+import { getJobById, likeJob, unlikeJob, checkLikeStatus, getAllJobs, type Job } from '../../api/jobService';
 import { getJobVersions, getJobVersion } from '../../api/jobVersionService';
 import { getCompanyById } from '../../api/companyService';
+import { getUserCVs, type CV } from '../../api/cvService';
+import { applyForJob, checkApplicationStatus, withdrawApplication, type JobApplication } from '../../api/jobApplicationService';
 import { useUser } from '../../contexts/UserContext';
 import { toast } from 'react-toastify';
 import ReportModal from '../../components/common/ReportModal';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 interface JobDetailProps {
   id?: string;
@@ -15,7 +19,9 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
   const { id: paramId } = useParams<{ id: string }>();
   const jobId = propId || paramId;
   
-  const { isAuthenticated } = useUser();
+  const { isAuthenticated, user } = useUser();
+  const isAdminOrRecruiter = user?.role === 'admin' || user?.role === 'recruiter';
+  const showCandidateActions = !isAdminOrRecruiter;
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,22 +29,26 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
   const [isLoadingLike, setIsLoadingLike] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isLoginConfirmModalOpen, setIsLoginConfirmModalOpen] = useState(false);
+  const [loginModalAction, setLoginModalAction] = useState<'apply' | 'like'>('apply');
   const [versions, setVersions] = useState<any[]>([]);
   const [showVersions, setShowVersions] = useState(false);
+  const [similarJobs, setSimilarJobs] = useState<Job[]>([]);
+  const [loadingSimilarJobs, setLoadingSimilarJobs] = useState(false);
+  const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
+  const [userCVs, setUserCVs] = useState<CV[]>([]);
+  const [selectedCVId, setSelectedCVId] = useState<number | null>(null);
+  const [coverLetter, setCoverLetter] = useState('');
+  const [isSubmittingApplication, setIsSubmittingApplication] = useState(false);
+  const [hasApplied, setHasApplied] = useState(false);
+  const [userApplication, setUserApplication] = useState<JobApplication | null>(null);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
   const navigate = useNavigate();
   
   // Function to check if the job has expired
   const isJobExpired = useCallback(() => {
     if (!job || !job.date_end_register) return false;
-    
-    const currentDate = new Date();
-    const expiryDate = new Date(job.date_end_register);
-    
-    // Set both dates to midnight for accurate day comparison
-    currentDate.setHours(0, 0, 0, 0);
-    expiryDate.setHours(0, 0, 0, 0);
-    
-    return currentDate > expiryDate;
+    return isPastDate(job.date_end_register);
   }, [job]);
 
   const getJobIdFromParam = useCallback(() => {
@@ -53,9 +63,95 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
     }
   }, [jobId]);
 
-  const handleLikeToggle = useCallback(async () => {
+  const handleApplyClick = useCallback(async () => {
+    // Nếu chưa login thì mở modal hỏi đăng nhập
     if (!isAuthenticated) {
-      navigate('/dang-nhap');
+      setLoginModalAction('apply');
+      setIsLoginConfirmModalOpen(true);
+      return;
+    }
+    
+    // Fetch user's CVs and open apply modal
+    try {
+      const response = await getUserCVs(1, 100); // Get all CVs
+      setUserCVs(response.cvs);
+      setIsApplyModalOpen(true);
+    } catch (error) {
+      console.error('Error fetching CVs:', error);
+      toast.error('Không thể tải danh sách CV');
+    }
+  }, [isAuthenticated]);
+
+  const handleLoginConfirm = useCallback(() => {
+    // Lưu URL hiện tại vào query param để redirect về sau khi login
+    const currentPath = window.location.pathname + window.location.search;
+    navigate(`/dang-nhap?redirect=${encodeURIComponent(currentPath)}`);
+  }, [navigate]);
+
+  // Check application status
+  const checkUserApplication = useCallback(async () => {
+    if (!job || !isAuthenticated || isAdminOrRecruiter) return;
+    
+    try {
+      const result = await checkApplicationStatus(job.id);
+      setHasApplied(result.hasApplied);
+      setUserApplication(result.application);
+    } catch (error) {
+      console.error('Error checking application status:', error);
+    }
+  }, [job, isAuthenticated, isAdminOrRecruiter]);
+
+  const handleSubmitApplication = useCallback(async () => {
+    if (!job) return;
+    
+    try {
+      setIsSubmittingApplication(true);
+      
+      await applyForJob({
+        job_id: job.id,
+        cv_id: selectedCVId || undefined,
+        cover_letter: coverLetter || undefined
+      });
+      
+      toast.success('Ứng tuyển thành công!');
+      setIsApplyModalOpen(false);
+      setSelectedCVId(null);
+      setCoverLetter('');
+      
+      // Refresh application status
+      await checkUserApplication();
+    } catch (error: any) {
+      console.error('Error submitting application:', error);
+      toast.error(error.response?.data?.message || 'Ứng tuyển thất bại');
+    } finally {
+      setIsSubmittingApplication(false);
+    }
+  }, [job, selectedCVId, coverLetter, checkUserApplication]);
+
+  const handleWithdrawApplication = useCallback(async () => {
+    if (!userApplication) return;
+    
+    try {
+      setIsWithdrawing(true);
+      await withdrawApplication(userApplication.id);
+      toast.success('Đã rút đơn ứng tuyển');
+      
+      // Reset application status
+      setHasApplied(false);
+      setUserApplication(null);
+    } catch (error: any) {
+      console.error('Error withdrawing application:', error);
+      toast.error(error.response?.data?.message || 'Không thể rút đơn ứng tuyển');
+    } finally {
+      setIsWithdrawing(false);
+    }
+  }, [userApplication]);
+
+  const handleLikeToggle = useCallback(async () => {
+    // Nếu chưa login hoặc là admin/recruiter thì mở modal hỏi đăng nhập
+    if (!isAuthenticated || isAdminOrRecruiter) {
+      setLoginModalAction('like');
+      setIsLoginConfirmModalOpen(true);
       return;
     }
 
@@ -80,7 +176,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
     } finally {
       setIsLoadingLike(false);
     }
-  }, [isAuthenticated, job, isLiked, navigate]);
+  }, [isAuthenticated, isAdminOrRecruiter, job, isLiked]);
 
   const fetchJobData = useCallback(async () => {
     const jobIdNum = getJobIdFromParam();
@@ -147,7 +243,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
       setJob(jobData);
 
       // Check like status if user is logged in
-      if (isAuthenticated) {
+      if (isAuthenticated && !isAdminOrRecruiter) {
         try {
           const isLiked = await checkLikeStatus(jobIdNum);
           setIsLiked(isLiked);
@@ -155,6 +251,21 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
           console.error('Error checking like status:', likeError);
           setIsLiked(false);
         }
+        
+        // Check application status
+        try {
+          const appStatus = await checkApplicationStatus(jobIdNum);
+          setHasApplied(appStatus.hasApplied);
+          setUserApplication(appStatus.application);
+        } catch (appError) {
+          console.error('Error checking application status:', appError);
+          setHasApplied(false);
+          setUserApplication(null);
+        }
+      } else {
+        setIsLiked(false);
+        setHasApplied(false);
+        setUserApplication(null);
       }
     } catch (err) {
       console.error('Error fetching job data:', err);
@@ -162,7 +273,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
     } finally {
       setLoading(false);
     }
-  }, [getJobIdFromParam, isAuthenticated]);
+  }, [getJobIdFromParam, isAuthenticated, isAdminOrRecruiter]);
 
   // Function to fetch job versions
   const fetchVersions = useCallback(async () => {
@@ -190,6 +301,37 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
       fetchVersions();
     }
   }, [job, fetchVersions]);
+
+  // Fetch similar jobs from the same company and industry
+  useEffect(() => {
+    const fetchSimilarJobs = async () => {
+      if (!job || !job.company_id || !job.industry_id) return;
+      
+      try {
+        setLoadingSimilarJobs(true);
+        const response = await getAllJobs(
+          1,
+          5, // Limit to 5 similar jobs
+          '',
+          job.company_id.toString(),
+          '',
+          job.industry_id.toString(),
+          { role: 'guest' }
+        );
+        
+        // Filter out the current job from similar jobs
+        const filteredJobs = response.jobs.filter(j => j.id !== job.id);
+        setSimilarJobs(filteredJobs.slice(0, 4)); // Show max 4 similar jobs
+      } catch (error) {
+        console.error('Error fetching similar jobs:', error);
+        setSimilarJobs([]);
+      } finally {
+        setLoadingSimilarJobs(false);
+      }
+    };
+    
+    fetchSimilarJobs();
+  }, [job]);
 
   if (loading) {
     return (
@@ -325,12 +467,12 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
                     {/* Expiry date banner */}
                     {job.date_end_register && <div className="mt-3 py-2 px-4 bg-gray-100 rounded-md inline-block">
                       <p className="text-sm text-gray-600">
-                        <span className="font-medium">Hạn nộp hồ sơ:</span> {new Date(job.date_end_register).toLocaleDateString('vi-VN')}
+                        <span className="font-medium">Hạn nộp hồ sơ:</span> {formatDate(job.date_end_register)}
                       </p>
                     </div>}
                     
-                    {/* Version information */}
-                    {job.version_number && (
+                    {/* Version information - Only visible to admin */}
+                    {user?.role === 'admin' && job.version_number && (
                       <div className="mt-3 py-2 px-4 bg-blue-50 rounded-md">
                         <div className="flex justify-between items-center">
                           <p className="text-sm text-blue-800">
@@ -380,31 +522,32 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
                     )}
                     
                     {/* Action buttons */}
-                    <div className="mt-5 flex space-x-4">
-                      {/* Apply button - larger */}
-                      <button 
-                        className={`flex-1 px-6 py-3 font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-300 flex items-center justify-center shadow-sm ${isJobExpired() ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500 cursor-not-allowed opacity-90 hover:opacity-100' : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 cursor-pointer'} text-white`}
-                        disabled={isJobExpired()}
-                      >
-                        {isJobExpired() ? (
-                          <>
-                            <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Hết hạn ứng tuyển
-                          </>
-                        ) : (
-                          <>
-                            <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13l-3 3m0 0l-3-3m3 3V8m0 13a9 9 0 110-18 9 9 0 010 18z" />
-                            </svg>
-                            Ứng tuyển ngay
-                          </>
-                        )}
-                      </button>
-                      
-                      {/* Like button - smaller */}
-                      {isAuthenticated && (
+                    {showCandidateActions && (
+                      <div className="mt-5 flex space-x-4">
+                        {/* Apply button - larger */}
+                        <button 
+                          onClick={handleApplyClick}
+                          className={`flex-1 px-6 py-3 font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-300 flex items-center justify-center shadow-sm ${isJobExpired() ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500 cursor-not-allowed opacity-90 hover:opacity-100' : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 cursor-pointer'} text-white`}
+                          disabled={isJobExpired()}
+                        >
+                          {isJobExpired() ? (
+                            <>
+                              <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              Hết hạn ứng tuyển
+                            </>
+                          ) : (
+                            <>
+                              <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13l-3 3m0 0l-3-3m3 3V8m0 13a9 9 0 110-18 9 9 0 010 18z" />
+                              </svg>
+                              Ứng tuyển ngay
+                            </>
+                          )}
+                        </button>
+                        
+                        {/* Like button - smaller */}
                         <button 
                           onClick={handleLikeToggle}
                           disabled={isLoadingLike}
@@ -415,8 +558,8 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
                           </svg>
                           {isLoadingLike ? 'Đang xử lý...' : isLiked ? 'Đã lưu' : 'Lưu'}
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -451,7 +594,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
                     <div>
                       <h3 className="text-sm font-medium text-gray-500 mb-1">Hạn nộp hồ sơ</h3>
                       <p className="text-base text-gray-900">
-                        {job.date_end_register ? new Date(job.date_end_register).toLocaleDateString('vi-VN') : 'Chưa có thông tin'}
+                        {job.date_end_register ? formatDate(job.date_end_register) : 'Chưa có thông tin'}
                       </p>
                     </div>
                   </div>
@@ -522,83 +665,151 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
                 </div>
                 
                 {/* Action buttons */}
-                <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                  <button 
-                    className={`flex-1 px-6 py-3 font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-300 ${isJobExpired() ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500 cursor-not-allowed opacity-90 hover:opacity-100' : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 cursor-pointer'} text-white`}
-                    disabled={isJobExpired()}
-                  >
-                    {isJobExpired() ? 'Hết hạn ứng tuyển' : 'Ứng tuyển ngay'}
-                  </button>
-                  
-                  {isAuthenticated && (
-                    <button 
-                      onClick={handleLikeToggle}
-                      disabled={isLoadingLike}
-                      className="cursor-pointer flex-1 px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300"
-                    >
-                      {isLoadingLike ? 'Đang xử lý...' : isLiked ? 'Đã lưu tin tuyển dụng' : 'Lưu tin tuyển dụng'}
-                    </button>
-                  )}
-                </div>
+                {showCandidateActions && (
+                  <div className="mt-8 space-y-4">
+                    {/* Application Status Banner */}
+                    {hasApplied && userApplication && (
+                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                              <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-green-900 mb-1">Bạn đã ứng tuyển vào vị trí này</h3>
+                              <p className="text-sm text-green-700">
+                                Ngày ứng tuyển: {formatDate(userApplication.applied_at)}
+                              </p>
+                              <p className="text-sm text-green-700">
+                                Trạng thái: <span className="font-medium">
+                                  {userApplication.status === 'pending' && 'Chờ xử lý'}
+                                  {userApplication.status === 'reviewing' && 'Đang xem xét'}
+                                  {userApplication.status === 'shortlisted' && 'Đạt vòng sơ tuyển'}
+                                  {userApplication.status === 'rejected' && 'Từ chối'}
+                                  {userApplication.status === 'accepted' && 'Chấp nhận'}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      {hasApplied ? (
+                        <button 
+                          onClick={handleWithdrawApplication}
+                          disabled={isWithdrawing || userApplication?.status === 'accepted' || userApplication?.status === 'rejected'}
+                          className={`flex-1 px-6 py-3 font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-300 ${
+                            userApplication?.status === 'accepted' || userApplication?.status === 'rejected'
+                              ? 'bg-gray-400 cursor-not-allowed'
+                              : 'bg-red-600 hover:bg-red-700 focus:ring-red-500 cursor-pointer'
+                          } text-white disabled:opacity-50`}
+                        >
+                          {isWithdrawing ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Đang xử lý...
+                            </span>
+                          ) : userApplication?.status === 'accepted' || userApplication?.status === 'rejected' ? (
+                            'Không thể rút đơn'
+                          ) : (
+                            <>
+                              <svg className="inline-block mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                              Rút đơn ứng tuyển
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={handleApplyClick}
+                          className={`flex-1 px-6 py-3 font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-300 ${isJobExpired() ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500 cursor-not-allowed opacity-90 hover:opacity-100' : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 cursor-pointer'} text-white`}
+                          disabled={isJobExpired()}
+                        >
+                          {isJobExpired() ? 'Hết hạn ứng tuyển' : 'Ứng tuyển ngay'}
+                        </button>
+                      )}
+                      
+                      <button 
+                        onClick={handleLikeToggle}
+                        disabled={isLoadingLike}
+                        className="cursor-pointer flex-1 px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLoadingLike ? 'Đang xử lý...' : isLiked ? 'Đã lưu tin tuyển dụng' : 'Lưu tin tuyển dụng'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Similar jobs section */}
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-gray-900">Việc làm tương tự</h2>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                    Gợi ý cho bạn
-                  </span>
                 </div>
                 <div className="space-y-4">
-                  {/* Similar job item 1 */}
-                  <div className="bg-white rounded-xl p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-gray-900">Nhân viên Phát triển Phần mềm</h3>
-                        <p className="text-gray-600 text-sm mt-1">Công ty ABC Technology</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Hà Nội
-                          </span>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            Toàn thời gian
-                          </span>
-                        </div>
-                      </div>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        15-20 triệu
-                      </span>
+                  {loadingSimilarJobs ? (
+                    <div className="flex justify-center items-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
-                  </div>
-                  
-                  {/* Similar job item 2 */}
-                  <div className="bg-white rounded-xl p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-gray-900">Chuyên viên Marketing</h3>
-                        <p className="text-gray-600 text-sm mt-1">Công ty XYZ Solutions</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Hồ Chí Minh
-                          </span>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            Bán thời gian
-                          </span>
-                        </div>
-                      </div>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        10-15 triệu
-                      </span>
+                  ) : similarJobs.length > 0 ? (
+                    <>
+                      {similarJobs.map((similarJob) => {
+                        const encodedJobId = btoa(similarJob.id.toString());
+                        return (
+                          <div 
+                            key={similarJob.id}
+                            onClick={() => navigate(`/viec-lam/${encodedJobId}`)}
+                            className="bg-white rounded-xl p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <h3 className="font-bold text-gray-900 hover:text-blue-600 transition-colors">{similarJob.title}</h3>
+                                <p className="text-gray-600 text-sm mt-1">{similarJob.company_name || job.company?.name}</p>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    {similarJob.location}
+                                  </span>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                    {similarJob.work_hours}
+                                  </span>
+                                  {similarJob.years_experienced > 0 && (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                      {similarJob.years_experienced} năm KN
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 ml-2 whitespace-nowrap">
+                                {similarJob.salary}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      <button 
+                        onClick={() => navigate(`/viec-lam?company=${job.company_id}&industry=${job.industry_id}`)}
+                        className="w-full py-3 text-center text-blue-600 hover:text-blue-800 font-medium bg-white rounded-xl border border-blue-200 hover:border-blue-300 hover:shadow-sm transition-all duration-200 flex items-center justify-center cursor-pointer"
+                      >
+                        <span>Xem tất cả việc làm tương tự</span>
+                        <svg className="ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>Không có việc làm tương tự nào khác</p>
                     </div>
-                  </div>
-                  
-                  <button className="w-full py-3 text-center text-blue-600 hover:text-blue-800 font-medium bg-white rounded-xl border border-blue-200 hover:border-blue-300 hover:shadow-sm transition-all duration-200 flex items-center justify-center">
-                    <span>Xem tất cả việc làm tương tự</span>
-                    <svg className="ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -859,6 +1070,164 @@ const JobDetail: React.FC<JobDetailProps> = ({ id: propId }) => {
           jobId={numericJobId}
           jobTitle={job.title}
         />
+      )}
+      
+      {/* Login Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isLoginConfirmModalOpen}
+        onClose={() => setIsLoginConfirmModalOpen(false)}
+        onConfirm={handleLoginConfirm}
+        title="Yêu cầu đăng nhập"
+        message={loginModalAction === 'apply' 
+          ? "Bạn cần đăng nhập để có thể ứng tuyển vào công việc này. Bạn có muốn đăng nhập ngay bây giờ không?"
+          : "Bạn cần đăng nhập để có thể lưu công việc này. Bạn có muốn đăng nhập ngay bây giờ không?"
+        }
+        confirmText="Đăng nhập ngay"
+        cancelText="Để sau"
+        type="info"
+      />
+
+      {/* Application Modal */}
+      {isApplyModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">Ứng tuyển: {job?.title}</h2>
+                <button
+                  onClick={() => {
+                    setIsApplyModalOpen(false);
+                    setSelectedCVId(null);
+                    setCoverLetter('');
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* CV Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chọn CV <span className="text-red-500">*</span>
+                </label>
+                {userCVs.length === 0 ? (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p className="text-yellow-800 text-sm">
+                      Bạn chưa có CV nào. Vui lòng{' '}
+                      <button
+                        onClick={() => {
+                          setIsApplyModalOpen(false);
+                          navigate('/quan-ly-cv');
+                        }}
+                        className="text-blue-600 hover:text-blue-700 font-medium underline"
+                      >
+                        tải CV lên
+                      </button>
+                      {' '}trước khi ứng tuyển.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {userCVs.map((cv) => (
+                      <div
+                        key={cv.id}
+                        onClick={() => setSelectedCVId(cv.id)}
+                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                          selectedCVId === cv.id
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                              selectedCVId === cv.id ? 'bg-blue-100' : 'bg-gray-100'
+                            }`}>
+                              <svg className={`w-6 h-6 ${selectedCVId === cv.id ? 'text-blue-600' : 'text-gray-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900">{cv.title}</p>
+                              <p className="text-sm text-gray-500">{cv.file_name}</p>
+                            </div>
+                          </div>
+                          {selectedCVId === cv.id && (
+                            <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Cover Letter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Thư xin việc (Cover Letter)
+                </label>
+                <textarea
+                  value={coverLetter}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value.length <= 1000) {
+                      setCoverLetter(value);
+                    }
+                  }}
+                  placeholder="Giới thiệu bản thân và lý do bạn phù hợp với vị trí này..."
+                  rows={6}
+                  maxLength={1000}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                />
+                <p className={`text-sm mt-1 ${coverLetter.length >= 1000 ? 'text-red-500' : 'text-gray-500'}`}>
+                  {coverLetter.length}/1000 ký tự
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 bg-gray-50 flex gap-3">
+              <button
+                onClick={() => {
+                  setIsApplyModalOpen(false);
+                  setSelectedCVId(null);
+                  setCoverLetter('');
+                }}
+                className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleSubmitApplication}
+                disabled={!selectedCVId || isSubmittingApplication}
+                className={`flex-1 px-6 py-3 rounded-lg font-medium transition-colors ${
+                  !selectedCVId || isSubmittingApplication
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                {isSubmittingApplication ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Đang gửi...
+                  </span>
+                ) : (
+                  'Gửi hồ sơ ứng tuyển'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

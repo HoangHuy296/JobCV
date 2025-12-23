@@ -29,6 +29,7 @@ export type FormField = {
   placeholder?: string;
   defaultValue?: any;
   multiple?: boolean;
+  description?: string;
   render?: (value: any, onChange: (value: any) => void) => React.ReactNode;
 };
 
@@ -229,81 +230,106 @@ const SlideOver: React.FC<SlideOverProps> = ({
                           </label>
                           
                           {field.type === 'textarea' ? (
-                            <textarea
-                              id={field.name}
-                              name={field.name}
-                              value={formData[field.name]}
-                              onChange={handleChange}
-                              placeholder={field.placeholder}
-                              rows={3}
-                              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[field.name] ? 'border-red-500' : 'border-gray-300'}`}
-                            />
-                          ) : field.type === 'select' ? (
-                            <SelectWithSearch
-                              options={field.options || []}
-                              selectedValues={formData[field.name] || []}
-                              onChange={(selectedValues) => handleMultiSelectChange(field.name, selectedValues)}
-                              placeholder={field.placeholder}
-                              className="w-full"
-                              multiple={field.multiple}
-                              error={errors[field.name]}
-                            />
-                          ) : field.type === 'checkbox' ? (
-                            <button
-                              type="button"
-                              id={field.name}
-                              onClick={() => {
-                                const newValue = !formData[field.name];
-                                setFormData(prev => ({ ...prev, [field.name]: newValue }));
-                              }}
-                              className={`${formData[field.name] ? 'bg-blue-600' : 'bg-gray-200'}
-                                relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
-                              role="switch"
-                              aria-checked={formData[field.name]}
-                            >
-                              <span className="sr-only">{field.label}</span>
-                              <span
-                                aria-hidden="true"
-                                className={`${formData[field.name] ? 'translate-x-5' : 'translate-x-0'}
-                                  pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                            <>
+                              <textarea
+                                id={field.name}
+                                name={field.name}
+                                value={formData[field.name]}
+                                onChange={handleChange}
+                                placeholder={field.placeholder}
+                                rows={3}
+                                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[field.name] ? 'border-red-500' : 'border-gray-300'}`}
                               />
-                            </button>
+                              {field.description && (
+                                <p className="mt-1 text-sm text-gray-500">{field.description}</p>
+                              )}
+                            </>
+                          ) : field.type === 'select' ? (
+                            <>
+                              <SelectWithSearch
+                                options={field.options || []}
+                                selectedValues={formData[field.name] || []}
+                                onChange={(selectedValues) => handleMultiSelectChange(field.name, selectedValues)}
+                                placeholder={field.placeholder}
+                                className="w-full"
+                                multiple={field.multiple}
+                                error={errors[field.name]}
+                              />
+                              {field.description && (
+                                <p className="mt-1 text-sm text-gray-500">{field.description}</p>
+                              )}
+                            </>
+                          ) : field.type === 'checkbox' ? (
+                            <>
+                              <button
+                                type="button"
+                                id={field.name}
+                                onClick={() => {
+                                  const newValue = !formData[field.name];
+                                  setFormData(prev => ({ ...prev, [field.name]: newValue }));
+                                }}
+                                className={`${formData[field.name] ? 'bg-blue-600' : 'bg-gray-200'}
+                                  relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+                                role="switch"
+                                aria-checked={formData[field.name]}
+                              >
+                                <span className="sr-only">{field.label}</span>
+                                <span
+                                  aria-hidden="true"
+                                  className={`${formData[field.name] ? 'translate-x-5' : 'translate-x-0'}
+                                    pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                                />
+                              </button>
+                              {field.description && (
+                                <p className="mt-1 text-sm text-gray-500">{field.description}</p>
+                              )}
+                            </>
                           ) : field.type === 'location' ? (
-                            <LocationSelect
-                              selectedValues={formData[field.name] || []}
-                              onChange={(value) => {
-                                setFormData(prev => ({ ...prev, [field.name]: value }));
-                                
-                                // Clear error when user makes a selection
-                                if (errors[field.name]) {
-                                  setErrors(prev => {
-                                    const newErrors = { ...prev };
-                                    delete newErrors[field.name];
-                                    return newErrors;
-                                  });
-                                }
-                              }}
-                              error={errors[field.name]}
-                            />
+                            <>
+                              <LocationSelect
+                                selectedValues={formData[field.name] || []}
+                                onChange={(value) => {
+                                  setFormData(prev => ({ ...prev, [field.name]: value }));
+                                  
+                                  // Clear error when user makes a selection
+                                  if (errors[field.name]) {
+                                    setErrors(prev => {
+                                      const newErrors = { ...prev };
+                                      delete newErrors[field.name];
+                                      return newErrors;
+                                    });
+                                  }
+                                }}
+                                error={errors[field.name]}
+                              />
+                              {field.description && (
+                                <p className="mt-1 text-sm text-gray-500">{field.description}</p>
+                              )}
+                            </>
                           ) : field.type === 'industry' ? (
-                            <IndustrySelect
-                              selectedValues={formData[field.name] || []}
-                              onChange={(value) => {
-                                setFormData(prev => ({ ...prev, [field.name]: value }));
-                                
-                                // Clear error when user makes a selection
-                                if (errors[field.name]) {
-                                  setErrors(prev => {
-                                    const newErrors = { ...prev };
-                                    delete newErrors[field.name];
-                                    return newErrors;
-                                  });
-                                }
-                              }}
-                              multiple={field.multiple}
-                              placeholder={field.placeholder}
-                              error={errors[field.name]}
-                            />
+                            <>
+                              <IndustrySelect
+                                selectedValues={formData[field.name] || []}
+                                onChange={(value) => {
+                                  setFormData(prev => ({ ...prev, [field.name]: value }));
+                                  
+                                  // Clear error when user makes a selection
+                                  if (errors[field.name]) {
+                                    setErrors(prev => {
+                                      const newErrors = { ...prev };
+                                      delete newErrors[field.name];
+                                      return newErrors;
+                                    });
+                                  }
+                                }}
+                                multiple={field.multiple}
+                                placeholder={field.placeholder}
+                                error={errors[field.name]}
+                              />
+                              {field.description && (
+                                <p className="mt-1 text-sm text-gray-500">{field.description}</p>
+                              )}
+                            </>
                           ) : field.type === 'image' ? (
                             <div>
                               <div>
@@ -407,12 +433,48 @@ const SlideOver: React.FC<SlideOverProps> = ({
                               ) : null}
                             </div>
                           ) : field.type === 'editor' ? (
-                            <QuillEditor
-                              value={formData[field.name] || ''}
-                              onChange={(value: string) => {
+                            <>
+                              <QuillEditor
+                                value={formData[field.name] || ''}
+                                onChange={(value: string) => {
+                                  setFormData(prev => ({ ...prev, [field.name]: value }));
+                                  
+                                  // Clear error when user types
+                                  if (errors[field.name]) {
+                                    setErrors(prev => {
+                                      const newErrors = { ...prev };
+                                      delete newErrors[field.name];
+                                      return newErrors;
+                                    });
+                                  }
+                                }}
+                                placeholder={field.placeholder}
+                                error={errors[field.name]}
+                              />
+                              {field.description && (
+                                <p className="mt-1 text-sm text-gray-500">{field.description}</p>
+                              )}
+                            </>
+                          ) : field.type === 'datetime' ? (
+                            <>
+                              <input
+                                type="date"
+                                id={field.name}
+                                name={field.name}
+                                value={formData[field.name] || ''}
+                                onChange={handleChange}
+                                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[field.name] ? 'border-red-500' : 'border-gray-300'}`}
+                              />
+                              {field.description && (
+                                <p className="mt-1 text-sm text-gray-500">{field.description}</p>
+                              )}
+                            </>
+                          ) : field.type === 'custom' && field.render ? (
+                            <>
+                              {field.render(formData[field.name], (value) => {
                                 setFormData(prev => ({ ...prev, [field.name]: value }));
                                 
-                                // Clear error when user types
+                                // Clear error when user makes a selection
                                 if (errors[field.name]) {
                                   setErrors(prev => {
                                     const newErrors = { ...prev };
@@ -420,42 +482,27 @@ const SlideOver: React.FC<SlideOverProps> = ({
                                     return newErrors;
                                   });
                                 }
-                              }}
-                              placeholder={field.placeholder}
-                              error={errors[field.name]}
-                            />
-                          ) : field.type === 'datetime' ? (
-                            <input
-                              type="date"
-                              id={field.name}
-                              name={field.name}
-                              value={formData[field.name] || ''}
-                              onChange={handleChange}
-                              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[field.name] ? 'border-red-500' : 'border-gray-300'}`}
-                            />
-                          ) : field.type === 'custom' && field.render ? (
-                            field.render(formData[field.name], (value) => {
-                              setFormData(prev => ({ ...prev, [field.name]: value }));
-                              
-                              // Clear error when user makes a selection
-                              if (errors[field.name]) {
-                                setErrors(prev => {
-                                  const newErrors = { ...prev };
-                                  delete newErrors[field.name];
-                                  return newErrors;
-                                });
-                              }
-                            })
+                              })}
+                              {field.description && (
+                                <p className="mt-1 text-sm text-gray-500">{field.description}</p>
+                              )}
+                            </>
                           ) : (
-                            <input
-                              type={field.type}
-                              id={field.name}
-                              name={field.name}
-                              value={formData[field.name] || ''}
-                              onChange={handleChange}
-                              placeholder={field.placeholder}
-                              className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[field.name] ? 'border-red-500' : 'border-gray-300'}`}
-                            />
+                            <>
+                              <input
+                                type={field.type}
+                                id={field.name}
+                                name={field.name}
+                                value={formData[field.name] || ''}
+                                onChange={handleChange}
+                                placeholder={field.placeholder}
+                                min={field.type === 'number' ? 0 : undefined}
+                                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[field.name] ? 'border-red-500' : 'border-gray-300'}`}
+                              />
+                              {field.description && (
+                                <p className="mt-1 text-sm text-gray-500">{field.description}</p>
+                              )}
+                            </>
                           )}
                           
                           {errors[field.name] && (

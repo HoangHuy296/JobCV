@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const { sendPasswordResetEmail, sendWelcomeEmail, sendEmailVerificationEmail } = require('../config/nodemailer');
@@ -116,6 +117,17 @@ const register = async (req, res) => {
     };
     
     const newUser = await User.create(userData);
+
+    try {
+      await Notification.createForAdmins({
+        title: 'Người dùng mới đăng ký',
+        message: `Người dùng "${name}" (${email}) vừa tạo tài khoản${role ? ` với vai trò ${role}` : ''}.`,
+        type: 'user_signup',
+        link: '/admin/quan-ly-nguoi-dung'
+      });
+    } catch (notificationError) {
+      console.error('Error notifying admins about new user registration:', notificationError);
+    }
     
     // Generate verification token
     const crypto = require('crypto');
@@ -136,7 +148,7 @@ const register = async (req, res) => {
     
     res.status(201).json({
       result: true,
-      message: 'Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.'
+      message: null
     });
   } catch (error) {
     console.error('Error during registration:', error);
@@ -272,7 +284,7 @@ const verifyEmail = async (req, res) => {
       // Continue even if email fails
     }
     
-    res.json({ result: true, message: 'Xác thực email thành công! Bạn có thể đăng nhập ngay bây giờ.' });
+    res.json({ result: true, message: null });
   } catch (error) {
     console.error('Error during email verification:', error);
     res.status(500).json({ result: null, message: 'Xác thực email thất bại' });
@@ -294,7 +306,7 @@ const resendVerification = async (req, res) => {
     
     if (!user) {
       // For security reasons, we don't reveal if the email exists
-      return res.json({ result: true, message: 'Nếu email tồn tại, một email xác thực mới đã được gửi.' });
+      return res.json({ result: true, message: null });
     }
     
     // Check if user is already active
@@ -319,7 +331,7 @@ const resendVerification = async (req, res) => {
       return res.status(500).json({ result: null, message: 'Không thể gửi email xác thực' });
     }
     
-    res.json({ result: true, message: 'Email xác thực đã được gửi lại. Vui lòng kiểm tra hộp thư của bạn.' });
+    res.json({ result: true, message: null });
   } catch (error) {
     console.error('Error during resend verification:', error);
     res.status(500).json({ result: null, message: 'Gửi lại email xác thực thất bại' });

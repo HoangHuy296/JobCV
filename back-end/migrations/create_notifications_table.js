@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   user_id INT NOT NULL,
   title VARCHAR(255) NOT NULL,
   message TEXT NOT NULL,
-  type ENUM('info', 'success', 'warning', 'error', 'job', 'campaign', 'review', 'system', 'review_request', 'job_approved', 'job_rejected', 'job_report', 'review_canceled', 'report_update') DEFAULT 'info',
+  type VARCHAR(50) NOT NULL DEFAULT 'info',
   link VARCHAR(500),
   is_read BOOLEAN DEFAULT FALSE,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

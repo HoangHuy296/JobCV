@@ -8,7 +8,8 @@ const {
   updateApplicationStatus,
   withdrawApplication,
   getJobApplicationStats,
-  updateApplicationCV
+  updateApplicationCV,
+  checkApplicationStatus
 } = require('../controllers/JobApplicationController');
 const authenticate = require('../middleware/auth');
 
@@ -214,6 +215,24 @@ router.put('/:id/status', authenticate, updateApplicationStatus);
  *         description: Forbidden
  */
 router.delete('/:id/withdraw', authenticate, withdrawApplication);
+
+/**
+ * @swagger
+ * /api/job-applications/check/{jobId}:
+ *   get:
+ *     summary: Check if user has applied for a job
+ *     tags: [Job Applications]
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Application status
+ */
+router.get('/check/:jobId', authenticate, checkApplicationStatus);
 
 /**
  * @swagger

@@ -4,7 +4,8 @@ export { default as AdminJobManagement } from './business/JobManagement';
 export { default as JobReviewManagement } from './business/JobReviewManagement';
 export { default as UnifiedJobManagement } from './business/UnifiedJobManagement';
 export { default as AdminCompanyManagement } from './business/CompanyManagement';
-export { default as CVManagement } from './business/CVManagement';
+export { default as AdminCVTemplateManagement } from './business/AdminCVTemplateManagement';
+export { default as AdminCVManagement } from './business/AdminCVManagement';
 export { default as IndustryManagement } from './business/IndustryManagement';
 export { default as RoleManagement } from './system/RoleManagement';
 export { default as UserManagement } from './system/UserManagement';
@@ -16,7 +17,6 @@ export { default as NotificationManagement } from './system/NotificationManageme
 export * from './Dashboard';
 export * from './business/JobManagement';
 export * from './business/CompanyManagement';
-export * from './business/CVManagement';
 export * from './business/IndustryManagement';
 export * from './system/RoleManagement';
 export * from './system/UserManagement';

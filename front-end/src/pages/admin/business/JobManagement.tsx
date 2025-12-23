@@ -60,7 +60,7 @@ const JobManagement: React.FC = () => {
   });
 
   // Fetch jobs with pagination and filtering
-  const fetchJobs = useCallback(async (page: number = 1, reset: boolean = false) => {
+  const fetchJobs = useCallback(async (page: number = 1, reset: boolean = false, limit?: number) => {
     try {
       setLoading(true);
       
@@ -80,8 +80,8 @@ const JobManagement: React.FC = () => {
       // No need to explicitly set user_id filter as admin can see all jobs
       
       const response = await getAllJobs(
-        page, 
-        pagination.limit, 
+        page,
+        limit ?? pagination.limit,
         reset ? '' : searchTerm,
         reset ? '' : companyFilter,
         '', // location parameter
@@ -558,7 +558,11 @@ const JobManagement: React.FC = () => {
           totalPages: pagination.totalPages,
           totalItems: pagination.total,
           itemsPerPage: pagination.limit,
-          onPageChange: fetchJobs
+          onPageChange: fetchJobs,
+          onItemsPerPageChange: (newLimit: number) => {
+            setPagination(prev => ({ ...prev, limit: newLimit }));
+            fetchJobs(1, false, newLimit);
+          }
         }
       : undefined;
   }, [currentPage, pagination, fetchJobs]);

@@ -1,9 +1,10 @@
 const db = require('../config/db');
+const { getLocalTimestamp } = require('../utils/dateUtils');
 
 class JobApplication {
   // Create a new job application
   static async create(applicationData) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     const dataWithTimestamps = {
       ...applicationData,
       applied_at: timestamp,
@@ -152,7 +153,7 @@ class JobApplication {
   // Update application status
   static async updateStatus(id, status, reviewedBy = null, notes = null) {
     try {
-      const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const timestamp = getLocalTimestamp();
       const updateData = {
         status,
         modified_at: timestamp
@@ -177,7 +178,7 @@ class JobApplication {
   // Update CV for application
   static async updateCV(id, cvId) {
     try {
-      const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const timestamp = getLocalTimestamp();
       await db.query(
         'UPDATE job_applications SET cv_id = ?, modified_at = ? WHERE id = ?',
         [cvId, timestamp, id]

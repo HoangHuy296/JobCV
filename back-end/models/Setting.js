@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { getLocalTimestamp } = require('../utils/dateUtils');
 
 class Setting {
   constructor(id, setting_key, setting_value, setting_group, description, created_at, modified_at, deleted_at) {
@@ -29,7 +30,6 @@ class Setting {
       { key: 'MAX_JOB_REPORTS_PER_USER', group: 'REPORT', value: '3', description: 'Maximum number of times a user can report the same job' },
       
       // Email settings
-      { key: 'EMAIL_SERVICE', group: 'EMAIL', value: 'gmail', description: 'Email service provider (gmail, outlook, yahoo, etc.)' },
       { key: 'EMAIL_USER', group: 'EMAIL', value: '', description: 'Email address for sending emails' },
       { key: 'EMAIL_APP_PASSWORD', group: 'EMAIL', value: '', description: 'Email app-specific password' },
       
@@ -75,7 +75,7 @@ class Setting {
   static async set(key, value, group = 'general', description = '') {
     try {
       const existing = await Setting.getByKeyAndGroup(key, group);
-      const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const timestamp = getLocalTimestamp();
       
       if (existing) {
         // Update existing setting
@@ -97,7 +97,7 @@ class Setting {
   static async delete(key, group) {
     try {
       const query = 'UPDATE settings SET deleted_at = ?, deleted = TRUE WHERE setting_key = ? AND setting_group = ? AND deleted_at IS NULL AND deleted = FALSE';
-      const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const timestamp = getLocalTimestamp();
       const [result] = await db.query(query, [timestamp, key, group]);
       return result.affectedRows > 0;
     } catch (error) {

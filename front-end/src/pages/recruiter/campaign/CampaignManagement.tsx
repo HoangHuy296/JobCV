@@ -9,6 +9,7 @@ import {
   type Campaign 
 } from '../../../api/campaignService';
 import { toast } from 'react-toastify';
+import { formatDate } from '../../../utils/dateUtils';
 import { DataManagement } from '../../../components';
 
 const CampaignManagement: React.FC = () => {
@@ -146,17 +147,17 @@ const CampaignManagement: React.FC = () => {
     {
       key: 'start_date' as keyof Campaign,
       title: 'Ngày bắt đầu',
-      render: (value: string) => value ? new Date(value).toLocaleDateString('vi-VN') : '-'
+      render: (value: string) => value ? formatDate(value) : '-'
     },
     {
       key: 'end_date' as keyof Campaign,
       title: 'Ngày kết thúc',
-      render: (value: string) => value ? new Date(value).toLocaleDateString('vi-VN') : '-'
+      render: (value: string) => value ? formatDate(value) : '-'
     },
     {
       key: 'created_at' as keyof Campaign,
       title: 'Ngày tạo',
-      render: (value: string) => new Date(value).toLocaleDateString('vi-VN')
+      render: (value: string) => formatDate(value)
     }
   ], [getStatusBadge]);
 

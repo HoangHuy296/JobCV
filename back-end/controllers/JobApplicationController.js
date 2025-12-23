@@ -148,20 +148,6 @@ const applyForJob = async (req, res) => {
       }
     }
     
-    // Send confirmation notification to user
-    const userNotification = await Notification.create({
-      user_id: user_id,
-      title: 'Ứng tuyển thành công',
-      message: `Bạn đã ứng tuyển thành công vào công việc "${job.title}"`,
-      type: 'success',
-      link: `/bang-dieu-khien`
-    });
-    
-    const notificationWS = req.app.get('notificationWS');
-    if (notificationWS) {
-      notificationWS.sendToUser(user_id, userNotification);
-    }
-    
     // Send confirmation email to user (check email_notifications_enabled first)
     if (req.user.email && req.user.email_notifications_enabled) {
       await sendApplicationConfirmationEmail(
@@ -233,7 +219,7 @@ const applyForJob = async (req, res) => {
 
     res.status(201).json({
       result: application,
-      message: 'Ứng tuyển thành công'
+      message: null
     });
   } catch (error) {
     console.error('Error applying for job:', error);
@@ -417,7 +403,7 @@ const updateApplicationStatus = async (req, res) => {
 
     res.json({
       result: updatedApplication,
-      message: 'Cập nhật trạng thái thành công'
+      message: null
     });
   } catch (error) {
     console.error('Error updating application status:', error);
@@ -461,7 +447,7 @@ const withdrawApplication = async (req, res) => {
 
     res.json({
       result: true,
-      message: 'Rút đơn ứng tuyển thành công'
+      message: null
     });
   } catch (error) {
     console.error('Error withdrawing application:', error);
@@ -585,13 +571,49 @@ const updateApplicationCV = async (req, res) => {
 
     res.json({
       result: updatedApplication,
-      message: 'Cập nhật CV thành công'
+      message: null
     });
   } catch (error) {
     console.error('Error updating application CV:', error);
     res.status(500).json({
       result: null,
       message: 'Lỗi khi cập nhật CV'
+    });
+  }
+};
+
+// Check if user has applied for a job
+const checkApplicationStatus = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const user_id = req.user.id;
+
+    const [results] = await db.query(
+      `SELECT id, status, applied_at, cv_id, cover_letter
+       FROM job_applications
+       WHERE job_id = ? AND user_id = ?`,
+      [jobId, user_id]
+    );
+
+    if (results.length === 0) {
+      return res.json({
+        result: { hasApplied: false, application: null },
+        message: null
+      });
+    }
+
+    res.json({
+      result: { 
+        hasApplied: true, 
+        application: results[0]
+      },
+      message: null
+    });
+  } catch (error) {
+    console.error('Error checking application status:', error);
+    res.status(500).json({
+      result: null,
+      message: 'Lỗi khi kiểm tra trạng thái ứng tuyển'
     });
   }
 };
@@ -604,5 +626,6 @@ module.exports = {
   updateApplicationStatus,
   withdrawApplication,
   getJobApplicationStats,
-  updateApplicationCV
+  updateApplicationCV,
+  checkApplicationStatus
 };

@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { getLocalTimestamp } = require('../utils/dateUtils');
 
 class BaseModel {
   constructor(table) {
@@ -7,7 +8,7 @@ class BaseModel {
 
   // Create a new record
   async create(data) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     const dataWithTimestamps = {
       ...data,
       deleted: false, // Explicitly set deleted flag to FALSE by default
@@ -41,7 +42,7 @@ class BaseModel {
 
   // Update a record by ID or conditions
   async update(conditions, data) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     const dataWithTimestamp = {
       ...data,
       modified_at: timestamp

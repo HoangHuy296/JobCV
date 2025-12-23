@@ -21,7 +21,7 @@ const SettingsManagement: React.FC = () => {
   });
 
   // Optimized fetch function with useCallback
-  const fetchData = useCallback(async (page: number = 1, reset: boolean = false) => {
+  const fetchData = useCallback(async (page: number = 1, reset: boolean = false, limit?: number) => {
     try {
       setLoading(true);
       
@@ -34,7 +34,7 @@ const SettingsManagement: React.FC = () => {
       
       const settingsResponse = await settingService.getAllSettings(
         page, 
-        pagination.limit, 
+        limit ?? pagination.limit, 
         reset || groupFilter === 'all' ? '' : groupFilter,
         reset ? '' : searchTerm
       );
@@ -57,7 +57,11 @@ const SettingsManagement: React.FC = () => {
           totalPages: pagination.totalPages,
           totalItems: pagination.total,
           itemsPerPage: pagination.limit,
-          onPageChange: fetchData
+          onPageChange: fetchData,
+          onItemsPerPageChange: (newLimit: number) => {
+            setPagination(prev => ({ ...prev, limit: newLimit }));
+            fetchData(1, false, newLimit);
+          }
         }
       : undefined;
   }, [currentPage, pagination, fetchData]);

@@ -1,8 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getCompanyById, subscribeToCompany, unsubscribeFromCompany, checkSubscriptionStatus, type Company } from '../../api/companyService';
+import { getAllJobs, type Job } from '../../api/jobService';
 import { useUser } from '../../contexts/UserContext';
 import { toast } from 'react-toastify';
+import { parseDate } from '../../utils/dateUtils';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import SelectWithSearch from '../../components/common/SelectWithSearch';
+import { useIndustryContext } from '../../contexts/IndustryContext';
+import { useLocationContext } from '../../contexts/LocationContext';
 
 interface CompanyDetailProps {
   id?: string;
@@ -12,13 +18,78 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ id: propId }) => {
   const { id: paramId } = useParams<{ id: string }>();
   const companyId = propId || paramId;
   
-  const { isAuthenticated } = useUser();
+  const { isAuthenticated, user } = useUser();
+  const { industries } = useIndustryContext();
+  const { locations } = useLocationContext();
+  const isAdminOrRecruiter = user?.role === 'admin' || user?.role === 'recruiter';
+  const showSubscriptionActions = !isAdminOrRecruiter;
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [companyJobs, setCompanyJobs] = useState<Job[]>([]);
+  const [loadingJobs, setLoadingJobs] = useState(false);
+  const [isLoginConfirmModalOpen, setIsLoginConfirmModalOpen] = useState(false);
+  
+  // Pagination and filter states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalJobs, setTotalJobs] = useState(0);
+  const [jobsPerPage] = useState(6);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [selectedIndustry, setSelectedIndustry] = useState<string>('');
+  const [selectedLocation, setSelectedLocation] = useState<string>('');
+  
+  // Applied filters (only updated when search button is clicked)
+  const [appliedKeyword, setAppliedKeyword] = useState('');
+  const [appliedIndustry, setAppliedIndustry] = useState<string>('');
+  const [appliedLocation, setAppliedLocation] = useState<string>('');
+  
+  // Industry and Location options for SelectWithSearch
+  const industryOptions = useMemo(() => [
+    { value: '', label: 'Tất cả ngành nghề' },
+    ...industries.map(industry => ({
+      value: industry.id.toString(),
+      label: industry.name
+    }))
+  ], [industries]);
+  
+  const locationOptions = useMemo(() => [
+    { value: '', label: 'Tất cả địa điểm' },
+    ...locations.map(location => ({
+      value: location,
+      label: location
+    }))
+  ], [locations]);
+  
+  // Handle filter changes (just update state, don't apply)
+  const handleIndustryChange = useCallback((selectedValues: string[]) => {
+    setSelectedIndustry(selectedValues.length > 0 ? selectedValues[0] : '');
+  }, []);
+  
+  const handleLocationChange = useCallback((selectedValues: string[]) => {
+    setSelectedLocation(selectedValues.length > 0 ? selectedValues[0] : '');
+  }, []);
+  
+  // Apply filters when search button is clicked
+  const handleSearch = useCallback(() => {
+    setAppliedKeyword(searchKeyword);
+    setAppliedIndustry(selectedIndustry);
+    setAppliedLocation(selectedLocation);
+    setCurrentPage(1);
+  }, [searchKeyword, selectedIndustry, selectedLocation]);
+  
+  const handleClearFilters = useCallback(() => {
+    setSearchKeyword('');
+    setSelectedIndustry('');
+    setSelectedLocation('');
+    setAppliedKeyword('');
+    setAppliedIndustry('');
+    setAppliedLocation('');
+    setCurrentPage(1);
+  }, []);
+  
   const navigate = useNavigate();
 
   const getCompanyId = useCallback(() => {
@@ -33,9 +104,16 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ id: propId }) => {
     }
   }, [companyId]);
 
+  const handleLoginConfirm = useCallback(() => {
+    // Lưu URL hiện tại vào query param để redirect về sau khi login
+    const currentPath = window.location.pathname + window.location.search;
+    navigate(`/dang-nhap?redirect=${encodeURIComponent(currentPath)}`);
+  }, [navigate]);
+
   const handleSubscribeToggle = useCallback(async () => {
-    if (!isAuthenticated) {
-      navigate('/dang-nhap');
+    // Nếu chưa login hoặc là admin/recruiter thì mở modal hỏi đăng nhập
+    if (!isAuthenticated || isAdminOrRecruiter) {
+      setIsLoginConfirmModalOpen(true);
       return;
     }
 
@@ -60,7 +138,7 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ id: propId }) => {
     } finally {
       setIsLoadingSubscription(false);
     }
-  }, [isAuthenticated, company, isSubscribed, navigate]);
+  }, [isAuthenticated, isAdminOrRecruiter, company, isSubscribed]);
 
   const fetchCompanyData = useCallback(async () => {
     const companyIdNum = getCompanyId();
@@ -76,7 +154,7 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ id: propId }) => {
       setCompany(companyData);
 
       // Check subscription status if user is logged in
-      if (isAuthenticated) {
+      if (isAuthenticated && !isAdminOrRecruiter) {
         try {
           const isSubscribed = await checkSubscriptionStatus(companyIdNum);
           setIsSubscribed(isSubscribed);
@@ -84,6 +162,8 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ id: propId }) => {
           console.error('Error checking subscription status:', subscriptionError);
           setIsSubscribed(false);
         }
+      } else {
+        setIsSubscribed(false);
       }
     } catch (err) {
       console.error('Error fetching company data:', err);
@@ -91,11 +171,62 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ id: propId }) => {
     } finally {
       setLoading(false);
     }
-  }, [getCompanyId, isAuthenticated]);
+  }, [getCompanyId, isAuthenticated, isAdminOrRecruiter]);
 
   useEffect(() => {
     fetchCompanyData();
   }, [fetchCompanyData, companyId]);
+
+  // Fetch company jobs with filters and pagination
+  useEffect(() => {
+    const fetchCompanyJobs = async () => {
+      if (!company) return;
+      
+      try {
+        setLoadingJobs(true);
+        const response = await getAllJobs(
+          currentPage,
+          jobsPerPage,
+          appliedKeyword,
+          company.id.toString(),
+          appliedLocation,
+          appliedIndustry,
+          { role: 'guest' }
+        );
+        
+        // Sort jobs based on selected sort option
+        const sortedJobs = response.jobs.sort((a, b) => {
+          const now = new Date();
+          const endDateA = parseDate(a.date_end_register);
+          const endDateB = parseDate(b.date_end_register);
+          
+          // Check if jobs are expired
+          const isExpiredA = endDateA < now;
+          const isExpiredB = endDateB < now;
+          
+          // Non-expired jobs come first
+          if (isExpiredA && !isExpiredB) return 1;
+          if (!isExpiredA && isExpiredB) return -1;
+
+          // Sort by newest (modified_at or created_at)
+          const modifiedA = parseDate(a.modified_at || a.created_at);
+          const modifiedB = parseDate(b.modified_at || b.created_at);
+          return modifiedB.getTime() - modifiedA.getTime();
+        });
+        
+        setCompanyJobs(sortedJobs);
+        setTotalJobs(response.pagination?.total || sortedJobs.length);
+      } catch (error) {
+        console.error('Error fetching company jobs:', error);
+        setCompanyJobs([]);
+        setTotalJobs(0);
+      } finally {
+        setLoadingJobs(false);
+      }
+    };
+    
+    fetchCompanyJobs();
+  }, [company, currentPage, appliedKeyword, appliedIndustry, appliedLocation, jobsPerPage]);
 
   if (loading) {
     return (
@@ -204,8 +335,8 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ id: propId }) => {
                 </div>
               </div>
               
-              {/* Subscribe button for logged in users */}
-              {(isAuthenticated && !propId) && (
+              {/* Subscribe button for candidate users */}
+              {(showSubscriptionActions && !propId) && (
                 <div className="md:mt-2">
                   <button 
                     onClick={handleSubscribeToggle}
@@ -266,70 +397,187 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ id: propId }) => {
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-gray-900">Tin tuyển dụng</h2>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                    12 việc làm
+                    {loadingJobs ? '...' : `${totalJobs} việc làm`}
                   </span>
                 </div>
+                
+                {/* Filter section */}
+                <div className="mb-4 space-y-2 bg-white rounded-lg p-3 border border-gray-200">
+                  {/* First row: Search and Button */}
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <input
+                        type="text"
+                        placeholder="Tìm kiếm công việc..."
+                        value={searchKeyword}
+                        onChange={(e) => setSearchKeyword(e.target.value)}
+                        className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      {searchKeyword && (
+                        <button
+                          onClick={() => setSearchKeyword('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleSearch}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      Tìm kiếm
+                    </button>
+                  </div>
+                  
+                  {/* Second row: Filters and Clear */}
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <SelectWithSearch
+                        options={locationOptions}
+                        selectedValues={selectedLocation ? [selectedLocation] : []}
+                        onChange={handleLocationChange}
+                        placeholder="Địa điểm"
+                        multiple={false}
+                        clearable={true}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <SelectWithSearch
+                        options={industryOptions}
+                        selectedValues={selectedIndustry ? [selectedIndustry] : []}
+                        onChange={handleIndustryChange}
+                        placeholder="Ngành nghề"
+                        multiple={false}
+                        clearable={true}
+                      />
+                    </div>
+                    {(appliedKeyword || appliedLocation || appliedIndustry) && (
+                      <button
+                        onClick={handleClearFilters}
+                        className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Xóa
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
                 <div className="space-y-4">
-                  {/* Job item 1 */}
-                  <div className="bg-white rounded-xl p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-gray-900">Nhân viên Phát triển Phần mềm</h3>
-                        <p className="text-gray-600 text-sm mt-1">Công ty ABC Technology</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Hà Nội
-                          </span>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            Toàn thời gian
-                          </span>
+                  {loadingJobs ? (
+                    <div className="flex justify-center items-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : companyJobs.length > 0 ? (
+                    <>
+                      {companyJobs.map((job) => {
+                        const encodedJobId = btoa(job.id.toString());
+                        const hasEndDate = job.date_end_register && job.date_end_register !== null;
+                        const endDate = hasEndDate ? parseDate(job.date_end_register) : null;
+                        const isExpired = endDate ? endDate < new Date() : false;
+                        const formattedEndDate = endDate ? endDate.toLocaleDateString('vi-VN', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        }) : '';
+                        
+                        return (
+                          <div 
+                            key={job.id}
+                            onClick={() => navigate(`/viec-lam/${encodedJobId}`)}
+                            className="bg-white rounded-xl p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <h3 className="font-bold text-gray-900 hover:text-blue-600 transition-colors">{job.title}</h3>
+                                <p className="text-gray-600 text-sm mt-1">{company.name}</p>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {job.location && (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                      {job.location}
+                                    </span>
+                                  )}
+                                  {job.work_hours && (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                      {job.work_hours}
+                                    </span>
+                                  )}
+                                  {job.industry_name && (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                      {job.industry_name}
+                                    </span>
+                                  )}
+                                  {job.years_experienced > 0 && (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                      {job.years_experienced} năm KN
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {job.salary && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 ml-2 whitespace-nowrap">
+                                  {job.salary}
+                                </span>
+                              )}
+                            </div>
+                            {hasEndDate && (
+                              <div className={`mt-3 flex items-center text-sm ${isExpired ? 'text-red-500' : 'text-gray-500'}`}>
+                                <svg className={`flex-shrink-0 mr-1.5 h-5 w-5 ${isExpired ? 'text-red-400' : 'text-gray-400'}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                </svg>
+                                {isExpired ? 'Đã hết hạn: ' : 'Hạn nộp: '}{formattedEndDate}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      
+                      {/* Pagination */}
+                      {totalJobs > jobsPerPage && (
+                        <div className="flex items-center justify-between bg-white rounded-xl p-4 border border-gray-200">
+                          <button
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
+                          >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                            Trước
+                          </button>
+                          
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-600">
+                              Trang {currentPage} / {Math.ceil(totalJobs / jobsPerPage)}
+                            </span>
+                          </div>
+                          
+                          <button
+                            onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalJobs / jobsPerPage), prev + 1))}
+                            disabled={currentPage >= Math.ceil(totalJobs / jobsPerPage)}
+                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
+                          >
+                            Sau
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
                         </div>
-                      </div>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        15-20 triệu
-                      </span>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>Công ty chưa có tin tuyển dụng nào</p>
                     </div>
-                    <div className="mt-3 flex items-center text-sm text-gray-500">
-                      <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                      </svg>
-                      Hạn nộp: 15/10/2025
-                    </div>
-                  </div>
-                  
-                  {/* Job item 2 */}
-                  <div className="bg-white rounded-xl p-4 border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-gray-900">Chuyên viên Marketing</h3>
-                        <p className="text-gray-600 text-sm mt-1">Công ty XYZ Solutions</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Hồ Chí Minh
-                          </span>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            Bán thời gian
-                          </span>
-                        </div>
-                      </div>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        10-15 triệu
-                      </span>
-                    </div>
-                    <div className="mt-3 flex items-center text-sm text-gray-500">
-                      <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                      </svg>
-                      Hạn nộp: 20/10/2025
-                    </div>
-                  </div>
-                  
-                  <button className="w-full py-3 text-center text-blue-600 hover:text-blue-800 font-medium bg-white rounded-xl border border-blue-200 hover:border-blue-300 hover:shadow-sm transition-all duration-200 flex items-center justify-center">
-                    <span>Xem tất cả tin tuyển dụng</span>
-                    <svg className="ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+                  )}
                 </div>
               </div>
               
@@ -582,6 +830,18 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ id: propId }) => {
           </div>
         </div>
       </div>
+      
+      {/* Login Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isLoginConfirmModalOpen}
+        onClose={() => setIsLoginConfirmModalOpen(false)}
+        onConfirm={handleLoginConfirm}
+        title="Yêu cầu đăng nhập"
+        message="Bạn cần đăng nhập để có thể theo dõi công ty này. Bạn có muốn đăng nhập ngay bây giờ không?"
+        confirmText="Đăng nhập ngay"
+        cancelText="Để sau"
+        type="info"
+      />
     </div>
   );
 };

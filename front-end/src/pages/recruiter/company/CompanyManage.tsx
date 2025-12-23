@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../../contexts/UserContext';
 import { updateCompany, type UpdateCompanyData } from '../../../api/companyService';
-import { uploadMedia } from '../../../api/mediaService';
+import { uploadMedia, createMediaFromUrl } from '../../../api/mediaService';
 import { toast } from 'react-toastify';
 import IndustrySelect from '../../../components/common/IndustrySelect';
 import LocationSelect from '../../../components/common/LocationSelect';
@@ -229,12 +229,17 @@ const CompanyManage: React.FC = () => {
           setIsSubmitting(false);
           return;
         }
-      } else if (logoUrl) {
-        // For URL input, we would need to implement a way to handle external URLs
-        // This could involve creating a new media record or updating the company directly
-        // For now, we'll just show a message that this would be implemented
-        toast.info('URL logo functionality would be implemented here');
-        // dataToSend.logo_url = logoUrl;
+      } else if (logoUrl && logoUrl !== company?.logo?.url) {
+        // Create media from URL if URL is different from current logo
+        try {
+          const mediaResponse = await createMediaFromUrl(logoUrl);
+          dataToSend.logo_id = mediaResponse.id;
+        } catch (urlError) {
+          console.error('Error creating media from URL:', urlError);
+          toast.error('Có lỗi xảy ra khi tạo media từ URL');
+          setIsSubmitting(false);
+          return;
+        }
       }
       
       // Submit all data

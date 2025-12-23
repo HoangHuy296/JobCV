@@ -21,7 +21,7 @@ const RoleManagementRefactored: React.FC = () => {
   });
 
   // Optimized fetch function with useCallback
-  const fetchRoles = useCallback(async (page: number = 1, reset: boolean = false) => {
+  const fetchRoles = useCallback(async (page: number = 1, reset: boolean = false, limit?: number) => {
     try {
       setLoading(true);
       
@@ -40,7 +40,7 @@ const RoleManagementRefactored: React.FC = () => {
       
       const response = await roleService.getAllRoles(
         page, 
-        pagination.limit, 
+        limit ?? pagination.limit, 
         searchQuery
       );
       
@@ -62,7 +62,11 @@ const RoleManagementRefactored: React.FC = () => {
           totalPages: pagination.totalPages,
           totalItems: pagination.total,
           itemsPerPage: pagination.limit,
-          onPageChange: fetchRoles
+          onPageChange: fetchRoles,
+          onItemsPerPageChange: (newLimit: number) => {
+            setPagination(prev => ({ ...prev, limit: newLimit }));
+            fetchRoles(1, false, newLimit);
+          }
         }
       : undefined;
   }, [currentPage, pagination, fetchRoles]);

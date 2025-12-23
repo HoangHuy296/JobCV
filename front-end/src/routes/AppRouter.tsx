@@ -22,15 +22,18 @@ import UserDashboard from '../pages/user/UserDashboard';
 import LikedJobs from '../pages/user/LikedJobs';
 import SubscribedCompanies from '../pages/user/SubscribedCompanies';
 import CVManagement from '../pages/user/CVManagement';
+import CreateCVFromTemplate from '../pages/user/CreateCVFromTemplate';
+import MyApplications from '../pages/user/MyApplications';
 // Admin pages
 import * as Admin from '../pages/admin';
 // Recruiter pages
 import RecruiterDashboard from '../pages/recruiter/Dashboard';
-import RecruiterJobManagement from '../pages/recruiter/JobManagement';
+import RecruiterJobManagement from '../pages/recruiter/job/JobManagement';
 import RecruiterCVManagement from '../pages/recruiter/CVManagement';
 import CompanyManage from '../pages/recruiter/company/CompanyManage';
 import CampaignManagement from '../pages/recruiter/campaign/CampaignManagement';
 import CampaignDetail from '../pages/recruiter/campaign/CampaignDetail';
+import JobApplications from '../pages/recruiter/JobApplications';
 
 // Layout wrappers for nested routes
 const PublicLayoutWrapper: React.FC = () => (
@@ -90,6 +93,8 @@ const AppRouter: React.FC = () => {
           <Route path="/cong-viec-da-thich" element={<LikedJobs />} />
           <Route path="/cong-ty-theo-doi" element={<SubscribedCompanies />} />
           <Route path="/quan-ly-cv" element={<CVManagement />} />
+          <Route path="/tao-cv-tu-template/:templateId" element={<CreateCVFromTemplate />} />
+          <Route path="/don-ung-tuyen" element={<MyApplications />} />
         </Route>
 
         {/* Recruiter routes */}
@@ -102,7 +107,8 @@ const AppRouter: React.FC = () => {
         >
           <Route path="/nha-tuyen-dung/bang-dieu-khien" element={<RecruiterDashboard />} />
           <Route path="/nha-tuyen-dung/quan-ly-cong-ty" element={<CompanyManage />} />
-          <Route path="/nha-tuyen-dung/quan-ly-cong-viec" element={<RecruiterJobManagement />} />
+          <Route path="/nha-tuyen-dung/quan-ly-tin-tuyen-dung" element={<RecruiterJobManagement />} />
+          <Route path="/nha-tuyen-dung/quan-ly-tin-tuyen-dung/:jobId/ung-vien" element={<JobApplications />} />
           <Route path="/nha-tuyen-dung/quan-ly-chien-dich" element={<CampaignManagement />} />
           <Route path="/nha-tuyen-dung/chien-dich/:id" element={<CampaignDetail />} />
           <Route path="/nha-tuyen-dung/quan-ly-cv" element={<RecruiterCVManagement />} />
@@ -122,7 +128,8 @@ const AppRouter: React.FC = () => {
           <Route path="/admin/quan-ly-cong-ty" element={<Admin.AdminCompanyManagement />} />
           <Route path="/admin/quan-ly-cong-viec" element={<Admin.UnifiedJobManagement />} />
           <Route path="/admin/quan-ly-nganh-nghe" element={<Admin.IndustryManagement />} />
-          <Route path="/admin/quan-ly-cv" element={<Admin.CVManagement />} />
+          <Route path="/admin/quan-ly-template-cv" element={<Admin.AdminCVTemplateManagement />} />
+          <Route path="/admin/quan-ly-cv" element={<Admin.AdminCVManagement />} />
           <Route path="/admin/quan-ly-hinh-anh" element={<Admin.MediaManagement />} />
           <Route path="/admin/quan-ly-thong-bao" element={<Admin.NotificationManagement />} />
           <Route path="/admin/cai-dat" element={<Admin.SettingsManagement />} />

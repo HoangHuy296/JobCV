@@ -25,7 +25,7 @@ const UserManagementRefactored: React.FC = () => {
   });
 
   // Optimized fetch function for users only
-  const fetchUsers = useCallback(async (page: number = 1, reset: boolean = false) => {
+  const fetchUsers = useCallback(async (page: number = 1, reset: boolean = false, limit?: number) => {
     try {
       setLoading(true);
       
@@ -39,7 +39,7 @@ const UserManagementRefactored: React.FC = () => {
       
       const usersResponse = await userService.getAllUsers(
         page, 
-        pagination.limit, 
+        limit ?? pagination.limit, 
         reset ? '' : searchTerm, 
         reset || statusFilter === 'all' ? undefined : statusFilter,
         reset || roleFilter === 'all' ? undefined : roleFilter
@@ -73,7 +73,11 @@ const UserManagementRefactored: React.FC = () => {
           totalPages: pagination.totalPages,
           totalItems: pagination.total,
           itemsPerPage: pagination.limit,
-          onPageChange: fetchUsers
+          onPageChange: fetchUsers,
+          onItemsPerPageChange: (newLimit: number) => {
+            setPagination(prev => ({ ...prev, limit: newLimit }));
+            fetchUsers(1, false, newLimit);
+          }
         }
       : undefined;
   }, [currentPage, pagination, fetchUsers]);

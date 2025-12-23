@@ -36,7 +36,11 @@ const LocationSelect: React.FC<LocationSelectProps> = ({
       );
       
       if (matchingLocation) {
-        const detail = currentLocation.substring(0, currentLocation.length - matchingLocation.length);
+        let detail = currentLocation.substring(0, currentLocation.length - matchingLocation.length);
+       
+        if (detail.endsWith(', ')) {
+          detail = detail.substring(0, detail.length - 2);
+        }
         return [detail, matchingLocation];
       }
       
@@ -51,8 +55,11 @@ const LocationSelect: React.FC<LocationSelectProps> = ({
   
   // Update local state when selectedValues changes (from parent)
   useEffect(() => {
-    // Only update if the values are actually different to prevent infinite loop
-    if (inputDetail !== detailPart) {
+    // Only update if the trimmed values are different to prevent resetting while typing
+    const currentTrimmed = inputDetail?.trim();
+    const newTrimmed = detailPart?.trim();
+    
+    if (currentTrimmed !== newTrimmed) {
       setInputDetail(detailPart);
     }
     if (selectedLocation !== locationPart) {
@@ -63,15 +70,17 @@ const LocationSelect: React.FC<LocationSelectProps> = ({
   // Handle changes to input detail
   const handleDetailChange = (value: string) => {
     setInputDetail(value);
-    const combined = value + selectedLocation;
-    onChange(combined?.trim());
+    const trimmedValue = value?.trim();
+    const combined = trimmedValue + (trimmedValue && selectedLocation ? ', ' : '') + selectedLocation;
+    onChange(combined);
   };
   
   // Handle changes to selected location
   const handleLocationChange = (value: string) => {
     setSelectedLocation(value);
-    const combined = inputDetail + value;
-    onChange(combined?.trim());
+    const trimmedDetail = inputDetail?.trim();
+    const combined = trimmedDetail + (trimmedDetail && value ? ', ' : '') + value;
+    onChange(combined);
   };
 
   if (loading) {

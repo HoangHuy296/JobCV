@@ -34,6 +34,7 @@ const {
 router.get('/', getAllJobs);
 router.get('/locations', getAllLocations);
 router.get('/preview/:id', getJobPreview);
+router.get('/:id', getJobById); // Allow guest access to job details
 
 // Apply authentication middleware to protected routes
 router.use(authenticate);
@@ -41,9 +42,6 @@ router.use(authenticate);
 // User-specific routes (must come before protected /:id routes to avoid conflicts)
 router.get('/user/my-jobs', getUserJobs);
 router.get('/user/liked-jobs', getUserLikedJobs);
-
-// Get job by ID route (must be after specific routes to avoid conflicts)
-router.get('/:id', getJobById);
 
 // Protected job-specific routes with ID parameter
 router.put('/:id', updateJob);

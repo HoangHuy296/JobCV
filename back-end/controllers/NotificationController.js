@@ -170,25 +170,6 @@ const createNotification = async (req, res) => {
 
     console.log(`[NotificationController] Created notification ${notification.id} for user ${targetUserId}`);
 
-    // Send WebSocket notification to the user
-    const notificationWS = req.app.get('notificationWS');
-    if (notificationWS) {
-      console.log(`[NotificationController] Sending WebSocket notification to user ${targetUserId}`);
-      
-      // Log connected users for debugging
-      notificationWS.logConnectedUsers();
-      
-      const sent = notificationWS.sendToUser(targetUserId, notification);
-      
-      if (sent) {
-        console.log(`[NotificationController] ✓ WebSocket notification delivered to user ${targetUserId}`);
-      } else {
-        console.log(`[NotificationController] ✗ User ${targetUserId} not connected. Notification saved to database.`);
-      }
-    } else {
-      console.warn(`[NotificationController] WebSocket not available. Notification saved to database only.`);
-    }
-
     res.status(201).json({
       result: notification,
       message: null

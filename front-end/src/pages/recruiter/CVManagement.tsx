@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { getUserCVs, deleteCV, type CV } from '../../api/cvService';
 import { toast } from 'react-toastify';
+import { formatDate } from '../../utils/dateUtils';
 import { DataManagement } from '../../components';
 
 const RecruiterCVManagement: React.FC = () => {
@@ -20,7 +21,7 @@ const RecruiterCVManagement: React.FC = () => {
   });
 
   // Optimized fetch function for CVs only
-  const fetchCVs = useCallback(async (page: number = 1, reset: boolean = false) => {
+  const fetchCVs = useCallback(async (page: number = 1, reset: boolean = false, limit?: number) => {
     try {
       setLoading(true);
       
@@ -33,7 +34,7 @@ const RecruiterCVManagement: React.FC = () => {
       
       const response = await getUserCVs(
         page, 
-        pagination.limit, 
+        limit ?? pagination.limit, 
         reset ? '' : searchTerm, 
         reset || templateFilter === 'all' ? undefined : templateFilter
       );
@@ -96,7 +97,7 @@ const RecruiterCVManagement: React.FC = () => {
     { 
       key: 'created_at' as keyof CV, 
       title: 'Ngày tạo',
-      render: (value: any) => new Date(value).toLocaleDateString('vi-VN')
+      render: (value: any) => formatDate(value)
     },
     { key: 'file_name' as keyof CV, title: 'Tên tệp' }
   ], []);
@@ -147,7 +148,11 @@ const RecruiterCVManagement: React.FC = () => {
               totalPages: pagination.totalPages,
               totalItems: pagination.total,
               itemsPerPage: pagination.limit,
-              onPageChange: fetchCVs
+              onPageChange: fetchCVs,
+              onItemsPerPageChange: (newLimit: number) => {
+                setPagination(prev => ({ ...prev, limit: newLimit }));
+                fetchCVs(1, false, newLimit);
+              }
             }
           : undefined
       }

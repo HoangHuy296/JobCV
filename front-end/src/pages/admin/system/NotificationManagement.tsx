@@ -36,7 +36,7 @@ const NotificationManagement: React.FC = () => {
   });
 
   // Optimized fetch function with useCallback
-  const fetchData = useCallback(async (page: number = 1, reset: boolean = false) => {
+  const fetchData = useCallback(async (page: number = 1, reset: boolean = false, limit?: number) => {
     try {
       setLoading(true);
       
@@ -49,14 +49,14 @@ const NotificationManagement: React.FC = () => {
       
       // Use getNotifications with filter parameter
       const filter = reset || typeFilter === 'all' ? 'all' : (typeFilter as 'all' | 'read' | 'unread');
-      const notificationsResponse = await getNotifications(
+      const response = await getNotifications(
         page, 
-        pagination.limit, 
+        limit ?? pagination.limit, 
         filter
       );
 
-      setNotifications(notificationsResponse.notifications || []);
-      const paginationData = notificationsResponse.pagination;
+      setNotifications(response.notifications || []);
+      const paginationData = response.pagination;
       setPagination({
         page: paginationData.page,
         limit: paginationData.limit,
@@ -90,7 +90,11 @@ const NotificationManagement: React.FC = () => {
           totalPages: pagination.totalPages,
           totalItems: pagination.total,
           itemsPerPage: pagination.limit,
-          onPageChange: fetchData
+          onPageChange: fetchData,
+          onItemsPerPageChange: (newLimit: number) => {
+            setPagination(prev => ({ ...prev, limit: newLimit }));
+            fetchData(1, false, newLimit);
+          }
         }
       : undefined;
   }, [currentPage, pagination, fetchData]);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { PropsWithChildren } from 'react';
 import { useUser } from '../../contexts/UserContext';
@@ -6,6 +6,12 @@ import NotificationBell from '../../components/common/NotificationBell';
 import SlideOver from '../../components/common/SlideOver';
 import { userService } from '../../api/userService';
 import { toast } from 'react-toastify';
+
+interface NavItem {
+  name: string;
+  path: string;
+  category?: string;
+}
 
 const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
   const navigate = useNavigate();
@@ -16,24 +22,53 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isProfileSlideOverOpen, setIsProfileSlideOverOpen] = useState(false);
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownRefs = useRef<Record<string, HTMLDivElement | null>>({});
   
   // Handle navigation and close mobile menu
   const handleNavigate = (path: string) => {
     navigate(path);
     setIsMobileMenuOpen(false);
+    setOpenDropdown(null);
   };
+
+  // Handle single item navigation
+  const handleSingleItemNavigate = useCallback((path: string) => {
+    navigate(path);
+    setOpenDropdown(null);
+  }, [navigate]);
+
+  // Handle profile navigation
+  const handleProfileNavigation = useCallback((path: string) => {
+    navigate(path);
+    setIsProfileDropdownOpen(false);
+  }, [navigate]);
+
+  // Toggle dropdown
+  const toggleDropdown = useCallback((category: string) => {
+    setOpenDropdown(prev => prev === category ? null : category);
+  }, []);
   
   // Check if current path is active
   const isActive = (path: string) => {
     return location.pathname === path;
   };
 
-  // Close profile dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Close profile dropdown if clicked outside
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
         setIsProfileDropdownOpen(false);
+      }
+      
+      // Close navigation dropdowns if clicked outside
+      if (openDropdown) {
+        const dropdownRef = dropdownRefs.current[openDropdown];
+        if (dropdownRef && !dropdownRef.contains(event.target as Node)) {
+          setOpenDropdown(null);
+        }
       }
     };
 
@@ -41,7 +76,7 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [openDropdown]);
 
   // Add scroll effect for header
   useEffect(() => {
@@ -65,6 +100,79 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
     toast.success('Đăng xuất thành công');
     navigate('/');
   };
+
+  // Navigation items grouped by category - memoized
+  const groupedNavItems = useMemo(() => {
+    // Get navigation items based on user role
+    let items: NavItem[] = [];
+    
+    if (user) {
+      switch (user.role) {
+        case 'admin':
+          items = [
+            { name: 'Bảng điều khiển', path: '/admin/bang-dieu-khien', category: 'dashboard' },
+            { name: 'Quản lý tin tuyển dụng', path: '/admin/quan-ly-cong-viec', category: 'business' },
+            { name: 'Quản lý công ty', path: '/admin/quan-ly-cong-ty', category: 'business' },
+            { name: 'Quản lý ngành nghề', path: '/admin/quan-ly-nganh-nghe', category: 'business' },
+            { name: 'Quản lý CV', path: '/admin/quan-ly-cv', category: 'business' },
+            { name: 'Cài đặt', path: '/admin/cai-dat', category: 'system' },
+            { name: 'Quản lý người dùng', path: '/admin/quan-ly-nguoi-dung', category: 'system' },
+            { name: 'Quản lý vai trò', path: '/admin/quan-ly-vai-tro', category: 'system' },
+            { name: 'Quản lý hình ảnh', path: '/admin/quan-ly-hinh-anh', category: 'system' },
+            { name: 'Quản lý thông báo', path: '/admin/quan-ly-thong-bao', category: 'system' },
+          ];
+          break;
+        case 'recruiter':
+          items = [
+            { name: 'Bảng điều khiển', path: '/nha-tuyen-dung/bang-dieu-khien', category: 'dashboard' },
+            { name: 'Danh sách công ty', path: '/cong-ty', category: 'dashboard2' },
+            { name: 'Tin tuyển dụng', path: '/viec-lam', category: 'dashboard3' },
+            { name: 'Quản lý công ty', path: '/nha-tuyen-dung/quan-ly-cong-ty', category: 'business' },
+            { name: 'Quản lý tin tuyển dụng', path: '/nha-tuyen-dung/quan-ly-cong-viec', category: 'business' },
+            { name: 'Quản lý chiến dịch', path: '/nha-tuyen-dung/quan-ly-chien-dich', category: 'business' },
+          ];
+          break;
+        case 'user':
+        default:
+          items = [
+            { name: 'Bảng điều khiển', path: '/bang-dieu-khien', category: 'dashboard' },
+            { name: 'Công ty', path: '/cong-ty', category: 'company' },
+            { name: 'Tin tuyển dụng', path: '/viec-lam', category: 'job' },
+            { name: 'Công việc đã thích', path: '/cong-viec-da-thich', category: 'user' },
+            { name: 'Công ty theo dõi', path: '/cong-ty-theo-doi', category: 'user' },
+            { name: 'Quản lý CV', path: '/quan-ly-cv', category: 'user' },
+            { name: 'Đơn ứng tuyển', path: '/don-ung-tuyen', category: 'user' },
+          ];
+      }
+    }
+    
+    // Group items by category
+    const grouped: Record<string, NavItem[]> = {};
+    items.forEach(item => {
+      const category = item.category || 'other';
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
+      grouped[category].push(item);
+    });
+    
+    return grouped;
+  }, [user]);
+
+  // Category names mapping - memoized
+  const getCategoryName = useMemo(() => {
+    const categoryNames: Record<string, string> = {
+      dashboard: 'Bảng điều khiển',
+      business: 'Doanh nghiệp',
+      system: 'Hệ thống',
+      user: 'Người dùng',
+      company: 'Công ty',
+      job: 'Việc làm',
+      other: 'Khác'
+    };
+    
+    return (category: string): string => categoryNames[category] || category;
+  }, []);
 
   // Profile form fields
   const profileFields = [
@@ -173,49 +281,94 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
             </div>
 
             {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center space-x-4">
-              <button 
-                onClick={() => handleNavigate('/bang-dieu-khien')} 
-                className={`cursor-pointer px-3 py-2 rounded-md text-sm font-medium transition-colors relative ${
-                  isActive('/bang-dieu-khien') 
-                    ? 'text-blue-600' 
-                    : 'text-gray-700 hover:text-blue-600'
-                }`}
-                aria-current={isActive('/bang-dieu-khien') ? 'page' : undefined}
-              >
-                Bảng điều khiển
-                {isActive('/bang-dieu-khien') && (
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-full"></span>
-                )}
-              </button>
-              <button 
-                onClick={() => handleNavigate('/cong-ty')} 
-                className={`cursor-pointer px-3 py-2 rounded-md text-sm font-medium transition-colors relative ${
-                  isActive('/cong-ty') 
-                    ? 'text-blue-600' 
-                    : 'text-gray-700 hover:text-blue-600'
-                }`}
-                aria-current={isActive('/cong-ty') ? 'page' : undefined}
-              >
-                Công ty
-                {isActive('/cong-ty') && (
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-full"></span>
-                )}
-              </button>
-              <button 
-                onClick={() => handleNavigate('/viec-lam')} 
-                className={`cursor-pointer px-3 py-2 rounded-md text-sm font-medium transition-colors relative ${
-                  isActive('/viec-lam') 
-                    ? 'text-blue-600' 
-                    : 'text-gray-700 hover:text-blue-600'
-                }`}
-                aria-current={isActive('/viec-lam') ? 'page' : undefined}
-              >
-                Tin tuyển dụng
-                {isActive('/viec-lam') && (
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-full"></span>
-                )}
-              </button>
+            <div className="flex items-center">
+              {user ? (
+                // Logged in users - show dynamic navigation
+                <div className="hidden md:flex items-center space-x-1 lg:space-x-2 flex-1 justify-center">
+                  {Object.entries(groupedNavItems).map(([category, items]) => (
+                    items.length === 1 ? (
+                      // Single item - show as regular link
+                      <button
+                        key={items[0].path}
+                        onClick={() => handleSingleItemNavigate(items[0].path)}
+                        className={`cursor-pointer px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${location.pathname === items[0].path ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                      >
+                        {items[0].name}
+                      </button>
+                    ) : (
+                      // Multiple items - show as dropdown
+                      <div 
+                        key={category} 
+                        className="relative"
+                        ref={(el) => {
+                          if (el) {
+                            dropdownRefs.current[category] = el;
+                          }
+                        }}
+                      >
+                        <button 
+                          className="cursor-pointer px-2 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 flex items-center transition-colors duration-200"
+                          onClick={() => toggleDropdown(category)}
+                          aria-haspopup="true"
+                          aria-expanded={openDropdown === category}
+                        >
+                          {getCategoryName(category)}
+                          <svg className={`ml-1 w-4 h-4 transition-transform duration-300 ease-in-out ${openDropdown === category ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                          </svg>
+                        </button>
+                        <div 
+                          className={`absolute left-1/2 transform -translate-x-1/2 mt-2 w-56 rounded-lg shadow-xl bg-white z-50 transition-all duration-300 ease-in-out origin-top ${openDropdown === category ? 'opacity-100 visible scale-100 translate-y-0' : 'opacity-0 invisible scale-95 -translate-y-2'}`}
+                        >
+                          <div className="py-2">
+                            {items.map((item) => (
+                              <button
+                                key={item.path}
+                                onClick={() => handleNavigate(item.path)}
+                                className={`cursor-pointer block w-full text-left px-4 py-2.5 text-sm font-medium transition-all duration-200 ${location.pathname === item.path ? 'text-blue-600 bg-blue-50 shadow-inner' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                              >
+                                {item.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  ))}
+                </div>
+              ) : (
+                // Not logged in - show simple navigation
+                <nav className="hidden md:flex items-center space-x-4">
+                  <button 
+                    onClick={() => handleNavigate('/cong-ty')} 
+                    className={`cursor-pointer px-3 py-2 rounded-md text-sm font-medium transition-colors relative ${
+                      isActive('/cong-ty') 
+                        ? 'text-blue-600' 
+                        : 'text-gray-700 hover:text-blue-600'
+                    }`}
+                    aria-current={isActive('/cong-ty') ? 'page' : undefined}
+                  >
+                    Công ty
+                    {isActive('/cong-ty') && (
+                      <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-full"></span>
+                    )}
+                  </button>
+                  <button 
+                    onClick={() => handleNavigate('/viec-lam')} 
+                    className={`cursor-pointer px-3 py-2 rounded-md text-sm font-medium transition-colors relative ${
+                      isActive('/viec-lam') 
+                        ? 'text-blue-600' 
+                        : 'text-gray-700 hover:text-blue-600'
+                    }`}
+                    aria-current={isActive('/viec-lam') ? 'page' : undefined}
+                  >
+                    Tin tuyển dụng
+                    {isActive('/viec-lam') && (
+                      <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-full"></span>
+                    )}
+                  </button>
+                </nav>
+              )}
 
               <div className="h-6 w-px bg-gray-200 mx-2"></div>
 
@@ -243,6 +396,25 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
                     {/* Dropdown menu */}
                     <div className={`origin-top-right absolute right-0 mt-2 w-48 rounded-lg shadow-xl bg-white z-50 transition-all duration-300 ease-in-out ${isProfileDropdownOpen ? 'opacity-100 visible scale-100 translate-y-0' : 'opacity-0 invisible scale-95 -translate-y-2'}`}>
                       <div className="py-2" role="none">
+                        {user?.role === 'recruiter' && (
+                          <>
+                            <button
+                              onClick={() => handleProfileNavigation('/nha-tuyen-dung/quan-ly-cong-ty')}
+                              className="block w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 cursor-pointer transition-all duration-200"
+                              role="menuitem"
+                            >
+                              Quản lý công ty
+                            </button>
+                            <button
+                              onClick={() => handleProfileNavigation('/nha-tuyen-dung/quan-ly-cong-viec')}
+                              className="block w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 cursor-pointer transition-all duration-200"
+                              role="menuitem"
+                            >
+                              Quản lý tin tuyển dụng
+                            </button>
+                            <div className="border-t border-gray-100 my-1"></div>
+                          </>
+                        )}
                         <button
                           onClick={handleProfileClick}
                           className="block w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 cursor-pointer transition-all duration-200"
@@ -284,7 +456,7 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
                   </button>
                 </>
               )}
-            </nav>
+            </div>
 
             {/* Mobile Menu Button */}
             <div className="md:hidden">
@@ -315,39 +487,75 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
           {isMobileMenuOpen && (
             <div className="md:hidden py-3 border-t border-gray-100">
               <nav className="flex flex-col space-y-1">
-                <button 
-                  onClick={() => handleNavigate('/')} 
-                  className={`px-4 py-3 rounded-md text-sm font-medium text-left transition-colors ${
-                    isActive('/') 
-                      ? 'bg-blue-50 text-blue-600' 
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
-                  }`}
-                  aria-current={isActive('/') ? 'page' : undefined}
-                >
-                  Trang chủ
-                </button>
-                <button 
-                  onClick={() => handleNavigate('/cong-ty')} 
-                  className={`px-4 py-3 rounded-md text-sm font-medium text-left transition-colors ${
-                    isActive('/cong-ty') 
-                      ? 'bg-blue-50 text-blue-600' 
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
-                  }`}
-                  aria-current={isActive('/cong-ty') ? 'page' : undefined}
-                >
-                  Công ty
-                </button>
-                <button 
-                  onClick={() => handleNavigate('/viec-lam')} 
-                  className={`px-4 py-3 rounded-md text-sm font-medium text-left transition-colors ${
-                    isActive('/viec-lam') 
-                      ? 'bg-blue-50 text-blue-600' 
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
-                  }`}
-                  aria-current={isActive('/viec-lam') ? 'page' : undefined}
-                >
-                  Tin tuyển dụng
-                </button>
+                {user ? (
+                  // Logged in users - show dynamic navigation
+                  <>
+                    {Object.entries(groupedNavItems).map(([category, items]) => (
+                      items.length === 1 ? (
+                        <button
+                          key={items[0].path}
+                          onClick={() => handleNavigate(items[0].path)}
+                          className={`cursor-pointer px-4 py-3 rounded-md text-sm font-medium text-left transition-colors ${location.pathname === items[0].path ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'}`}
+                        >
+                          {items[0].name}
+                        </button>
+                      ) : (
+                        <div key={category} className="space-y-1">
+                          <button
+                            className="cursor-pointer px-4 py-3 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 flex items-center justify-between w-full transition-colors"
+                            onClick={() => toggleDropdown(category)}
+                            aria-expanded={openDropdown === category}
+                          >
+                            {getCategoryName(category)}
+                            <svg className={`h-5 w-5 transition-transform duration-200 ${openDropdown === category ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                          </button>
+                          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${openDropdown === category ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                            <div className="pl-4 space-y-1">
+                              {items.map((item) => (
+                                <button
+                                  key={item.path}
+                                  onClick={() => handleNavigate(item.path)}
+                                  className={`cursor-pointer block px-4 py-3 rounded-md text-sm font-medium w-full text-left transition-colors ${location.pathname === item.path ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'}`}
+                                >
+                                  {item.name}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    ))}
+                  </>
+                ) : (
+                  // Not logged in - show simple navigation
+                  <>
+                    <button 
+                      onClick={() => handleNavigate('/cong-ty')} 
+                      className={`px-4 py-3 rounded-md text-sm font-medium text-left transition-colors ${
+                        isActive('/cong-ty') 
+                          ? 'bg-blue-50 text-blue-600' 
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+                      }`}
+                      aria-current={isActive('/cong-ty') ? 'page' : undefined}
+                    >
+                      Công ty
+                    </button>
+                    <button 
+                      onClick={() => handleNavigate('/viec-lam')} 
+                      className={`px-4 py-3 rounded-md text-sm font-medium text-left transition-colors ${
+                        isActive('/viec-lam') 
+                          ? 'bg-blue-50 text-blue-600' 
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+                      }`}
+                      aria-current={isActive('/viec-lam') ? 'page' : undefined}
+                    >
+                      Tin tuyển dụng
+                    </button>
+                  </>
+                )}
+                
                 <div className="h-px bg-gray-200 my-2"></div>
                 
                 {user ? (

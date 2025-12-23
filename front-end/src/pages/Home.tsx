@@ -2,15 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAllJobs, type Job } from '../api/jobService';
 import { getAllCompanies, type Company } from '../api/companyService';
-import { getAllIndustries, type Industry } from '../api/industryService';
+import { type Industry } from '../api/industryService';
 import { LuBriefcase, LuMapPin, LuDollarSign, LuClock, LuBuilding2, LuTrendingUp, LuUsers, LuSearch, LuArrowRight, LuStar } from 'react-icons/lu';
 import { toast } from 'react-toastify';
+import { parseDate, getDaysDifference } from '../utils/dateUtils';
+import { useIndustryContext } from '../contexts/IndustryContext';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
+  const { industries, loading: industriesLoading } = useIndustryContext();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [industries, setIndustries] = useState<Industry[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchLocation, setSearchLocation] = useState('');
@@ -22,24 +24,18 @@ const Home: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [jobsData, companiesData, industriesData] = await Promise.all([
+      const [jobsData, companiesData] = await Promise.all([
         getAllJobs(1, 6),
-        getAllCompanies(1, 8),
-        getAllIndustries(1, 8)
+        getAllCompanies(1, 8)
       ]);
       setJobs(jobsData.jobs);
       setCompanies(companiesData.companies);
-      setIndustries(industriesData.industries);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Không thể tải dữ liệu');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLogin = () => {
-    navigate('/dang-nhap');
   };
 
   const handleRegister = () => {
@@ -60,22 +56,19 @@ const Home: React.FC = () => {
   };
 
   const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = getDaysDifference(dateString, new Date().toISOString());
     
     if (diffDays === 0) return 'Hôm nay';
     if (diffDays === 1) return 'Hôm qua';
     if (diffDays < 7) return `${diffDays} ngày trước`;
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} tuần trước`;
-    return date.toLocaleDateString('vi-VN');
+    return parseDate(dateString).toLocaleDateString('vi-VN');
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 py-20">
+      <div className="mt-[-32px] relative overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 py-20">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-10 left-10 w-72 h-72 bg-white rounded-full blur-3xl"></div>
           <div className="absolute bottom-10 right-10 w-96 h-96 bg-white rounded-full blur-3xl"></div>
@@ -183,7 +176,7 @@ const Home: React.FC = () => {
             {jobs.map((job) => (
               <div
                 key={job.id}
-                onClick={() => navigate(`/viec-lam/${job.id}`)}
+                onClick={() => navigate(`/viec-lam/${btoa(job.id.toString())}`)}
                 className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer group border border-gray-100 hover:border-blue-200"
               >
                 <div className="p-6">
@@ -193,7 +186,9 @@ const Home: React.FC = () => {
                       {job.company_logo ? (
                         <img src={job.company_logo} alt={job.company_name} className="w-full h-full object-cover rounded-lg" />
                       ) : (
-                        <LuBuilding2 className="w-7 h-7 text-blue-600" />
+                        <svg className="h-10 w-10 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -263,30 +258,43 @@ const Home: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {companies.slice(0, 8).map((company) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {companies.slice(0, 6).map((company) => (
               <div
                 key={company.id}
-                onClick={() => navigate(`/cong-ty/${company.id}`)}
-                className="bg-white rounded-xl p-6 shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer group border border-gray-100 hover:border-blue-200"
+                onClick={() => navigate(`/cong-ty/${btoa(company.id.toString())}`)}
+                className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer group border border-gray-100 hover:border-blue-200"
               >
-                <div className="flex flex-col items-center text-center">
-                  <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    {company.logo?.url ? (
-                      <img src={company.logo.url} alt={company.name} className="w-full h-full object-cover rounded-xl" />
-                    ) : (
-                      <LuBuilding2 className="w-10 h-10 text-blue-600" />
-                    )}
-                  </div>
-                  <h3 className="font-bold text-gray-900 mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                    {company.name}
-                  </h3>
-                  <p className="text-sm text-gray-500 line-clamp-1">{company.location}</p>
-                  {company.subscription_count && company.subscription_count > 0 && (
-                    <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
-                      <LuUsers className="w-3 h-3" />
-                      <span>{company.subscription_count} theo dõi</span>
+                <div className="p-6">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                      {company.logo?.url ? (
+                        <img src={company.logo.url} alt={company.name} className="w-full h-full object-cover rounded-xl" />
+                      ) : (
+                        <LuBuilding2 className="w-10 h-10 text-blue-600" />
+                      )}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 mb-1">
+                        {company.name}
+                      </h3>
+                      <div className="flex items-center text-sm text-gray-500 mt-1">
+                        <LuMapPin className="w-4 h-4 mr-1" />
+                        <span className="line-clamp-1">{company.location}</span>
+                      </div>
+                    </div>
+                  </div>
+                  {company.subscription_count && company.subscription_count > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
+                      <LuUsers className="w-4 h-4 text-blue-600" />
+                      <span className="font-medium">{company.subscription_count} người theo dõi</span>
+                    </div>
+                  )}
+                  {company.description && (
+                    <div 
+                      className="text-sm text-gray-600 line-clamp-2 mt-3"
+                      dangerouslySetInnerHTML={{ __html: company.description }}
+                    />
                   )}
                 </div>
               </div>
@@ -302,23 +310,44 @@ const Home: React.FC = () => {
           <p className="text-gray-600">Khám phá cơ hội việc làm theo ngành nghề</p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {industries.map((industry) => (
-            <button
-              key={industry.id}
-              onClick={() => navigate(`/viec-lam?industry=${industry.id}`)}
-              className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100 hover:border-blue-200 group cursor-pointer"
-            >
-              <div className="flex flex-col items-center text-center">
-                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <LuBriefcase className="w-6 h-6 text-blue-600" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {industriesLoading ? (
+            <div className="col-span-full text-center text-gray-500">Đang tải ngành nghề...</div>
+          ) : (
+            industries.slice(0, 8).map((industry, index) => {
+            const colors = [
+              { bg: 'from-blue-500 to-indigo-600', icon: 'text-white' },
+              { bg: 'from-purple-500 to-pink-600', icon: 'text-white' },
+              { bg: 'from-green-500 to-teal-600', icon: 'text-white' },
+              { bg: 'from-orange-500 to-red-600', icon: 'text-white' },
+              { bg: 'from-cyan-500 to-blue-600', icon: 'text-white' },
+              { bg: 'from-violet-500 to-purple-600', icon: 'text-white' },
+              { bg: 'from-emerald-500 to-green-600', icon: 'text-white' },
+              { bg: 'from-rose-500 to-pink-600', icon: 'text-white' },
+            ];
+            const colorScheme = colors[index % colors.length];
+            
+            return (
+              <button
+                key={industry.id}
+                onClick={() => navigate(`/viec-lam?industry=${industry.id}`)}
+                className="bg-white rounded-2xl p-6 shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-transparent group cursor-pointer overflow-hidden relative"
+              >
+                <div className="flex flex-col items-center text-center relative z-10">
+                  <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${colorScheme.bg} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg`}>
+                    <svg className={`w-8 h-8 ${colorScheme.icon}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 text-base">
+                    {industry.name}
+                  </h3>
                 </div>
-                <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2">
-                  {industry.name}
-                </h3>
-              </div>
-            </button>
-          ))}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              </button>
+            );
+          })
+          )}
         </div>
       </div>
 

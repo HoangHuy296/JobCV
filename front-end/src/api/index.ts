@@ -20,7 +20,7 @@ interface AxiosErrorResponse<T = any> extends AxiosError<T> {
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api',
-  timeout: 10000,
+  timeout: 30000, // Increased to 30 seconds for CV creation with sections
   headers: {
     'Content-Type': 'application/json',
   },

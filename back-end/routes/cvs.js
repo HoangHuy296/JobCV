@@ -1,14 +1,32 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const fs = require('fs');
 const path = require('path');
-const { getUserCVs, uploadCV, downloadCV, deleteCV, checkCVInApplications } = require('../controllers/CVController');
+const { getAllCVs, getUserCVs, uploadCV, downloadCV, deleteCV, checkCVInApplications } = require('../controllers/CVController');
 const authenticate = require('../middleware/auth');
+
+// Middleware to check admin role
+const requireAdmin = (req, res, next) => {
+  if (req.user.role.name !== 'admin') {
+    return res.status(403).json({ 
+      success: false, 
+      message: 'Bạn không có quyền truy cập' 
+    });
+  }
+  next();
+};
 
 // Configure multer for CV file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/cvs/');
+    const uploadDir = path.join(__dirname, '..', 'uploads', 'cvs');
+    try {
+      fs.mkdirSync(uploadDir, { recursive: true });
+      cb(null, uploadDir);
+    } catch (err) {
+      cb(err);
+    }
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -96,6 +114,10 @@ const upload = multer({
  *       500:
  *         description: Server error
  */
+// Admin route - get all CVs
+router.get('/admin/all', authenticate, requireAdmin, getAllCVs);
+
+// User route - get user's CVs
 router.get('/', authenticate, getUserCVs);
 
 /**

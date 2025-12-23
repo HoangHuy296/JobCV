@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { getJobPreview, type Job } from '../../api/jobService';
+import { reviewJob } from '../../api/jobReviewService';
 import { toast } from 'react-toastify';
+import { formatDate as formatDateUtil } from '../../utils/dateUtils';
+import { useUser } from '../../contexts/UserContext';
+import { LuCheck, LuX, LuTriangleAlert, LuLoader } from 'react-icons/lu';
 
 // Extended Job type for preview that includes additional properties
 type JobPreviewData = Omit<Job, 'company_logo'> & {
@@ -20,10 +24,21 @@ const JobPreview: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const [searchParams] = useSearchParams();
     const versionId = searchParams.get('version_id');
+    const navigate = useNavigate();
+    const { user } = useUser();
 
     const [job, setJob] = useState<JobPreviewData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    
+    // Review modal states
+    const [showReviewModal, setShowReviewModal] = useState(false);
+    const [reviewAction, setReviewAction] = useState<'approved' | 'rejected' | null>(null);
+    const [feedback, setFeedback] = useState('');
+    const [reviewing, setReviewing] = useState(false);
+    
+    const isAdmin = user?.role === 'admin';
+    const canReview = isAdmin && job?.status === 'pending_review';
 
     useEffect(() => {
         const fetchJobDetails = async () => {
@@ -44,6 +59,48 @@ const JobPreview: React.FC = () => {
 
         fetchJobDetails();
     }, [id, versionId]);
+    
+    // Handle review action
+    const handleReview = async () => {
+        if (!job || !reviewAction) return;
+
+        if (reviewAction === 'rejected' && !feedback.trim()) {
+            toast.error('Vui lòng nhập lý do từ chối');
+            return;
+        }
+
+        try {
+            setReviewing(true);
+            const feedbackToSend = reviewAction === 'rejected' ? feedback.trim() : (feedback.trim() || undefined);
+            await reviewJob(job.id, reviewAction, feedbackToSend);
+            
+            toast.success(
+                reviewAction === 'approved' 
+                    ? 'Đã phê duyệt công việc thành công' 
+                    : 'Đã từ chối công việc'
+            );
+            
+            setShowReviewModal(false);
+            setReviewAction(null);
+            setFeedback('');
+            
+            // Redirect to review management page
+            navigate('/admin/quan-ly-duyet-cong-viec');
+        } catch (error: any) {
+            console.error('Error reviewing job:', error);
+            const errorMessage = error?.response?.data?.message || 'Lỗi khi duyệt công việc';
+            toast.error(errorMessage);
+        } finally {
+            setReviewing(false);
+        }
+    };
+    
+    // Open review modal
+    const openReviewModal = (action: 'approved' | 'rejected') => {
+        setReviewAction(action);
+        setFeedback('');
+        setShowReviewModal(true);
+    };
 
     // Format salary for display
     const formatSalary = (salary: string): string => {
@@ -64,12 +121,10 @@ const JobPreview: React.FC = () => {
     // Format date for display
     const formatDate = (dateString: string): string => {
         if (!dateString) return '';
-
-        const date = new Date(dateString);
-        return date.toLocaleDateString('vi-VN', {
+        return formatDateUtil(dateString, {
             year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
+            month: 'long',
+            day: 'numeric'
         });
     };
 
@@ -107,17 +162,39 @@ const JobPreview: React.FC = () => {
             {/* Preview banner - always visible at the top */}
             <div className="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-1 mt-[-32px]">
                 <div className="container mx-auto px-4 flex items-center justify-between">
-                    <div className="flex items-center">
-                        <svg className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                        </svg>
-                        <h2 className="text-lg font-bold">Chế độ xem trước</h2>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center">
+                            <svg className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            <h2 className="text-lg font-bold">Chế độ xem trước</h2>
+                        </div>
+                        {versionId && (
+                            <p className="text-sm bg-blue-700 px-2 py-1 rounded">
+                                Đang xem phiên bản: {job.version_number || 'Không xác định'}
+                            </p>
+                        )}
                     </div>
-                    {versionId && (
-                        <p className="text-sm bg-blue-700 px-2 py-1 rounded">
-                            Đang xem phiên bản: {job.version_number || 'Không xác định'}
-                        </p>
+                    
+                    {/* Review buttons for admin */}
+                    {canReview && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => openReviewModal('approved')}
+                                className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                            >
+                                <LuCheck className="w-5 h-5" />
+                                <span>Phê duyệt</span>
+                            </button>
+                            <button
+                                onClick={() => openReviewModal('rejected')}
+                                className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                            >
+                                <LuX className="w-5 h-5" />
+                                <span>Từ chối</span>
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>
@@ -478,6 +555,112 @@ const JobPreview: React.FC = () => {
                     </div>
                 </div>
             </div>
+            
+            {/* Review Modal */}
+            {showReviewModal && job && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="px-6 py-4 border-b border-gray-200">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                                {reviewAction === 'approved' ? 'Phê duyệt công việc' : 'Từ chối công việc'}
+                            </h3>
+                        </div>
+
+                        <div className="px-6 py-4 space-y-4">
+                            {/* Job Details */}
+                            <div className="bg-gray-50 rounded-lg p-4">
+                                <h4 className="font-semibold text-gray-900 mb-2">{job.title}</h4>
+                                <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                                    <div>Công ty: {job.company_name || 'N/A'}</div>
+                                    <div>Ngành: {job.industry_name || 'N/A'}</div>
+                                    <div>Địa điểm: {job.location}</div>
+                                    <div>Lương: {job.salary}</div>
+                                </div>
+                            </div>
+
+                            {/* Feedback */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    {reviewAction === 'approved' ? 'Ghi chú (tùy chọn)' : 'Lý do từ chối *'}
+                                </label>
+                                <textarea
+                                    value={feedback}
+                                    onChange={(e) => setFeedback(e.target.value)}
+                                    rows={4}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder={
+                                        reviewAction === 'approved'
+                                            ? 'Nhập ghi chú nếu cần...'
+                                            : 'Nhập lý do từ chối công việc này...'
+                                    }
+                                />
+                                {reviewAction === 'rejected' && (
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Lý do từ chối sẽ được gửi đến người tạo công việc
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Warning */}
+                            {reviewAction === 'rejected' && (
+                                <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <LuTriangleAlert className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                    <div className="text-sm text-red-800">
+                                        <p className="font-medium">Lưu ý khi từ chối:</p>
+                                        <p className="mt-1">
+                                            Công việc sẽ được chuyển về trạng thái "rejected" và người tạo sẽ nhận được thông báo kèm lý do từ chối.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+                            <button
+                                onClick={() => {
+                                    setShowReviewModal(false);
+                                    setReviewAction(null);
+                                    setFeedback('');
+                                }}
+                                disabled={reviewing}
+                                className="cursor-pointer px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={handleReview}
+                                disabled={reviewing || (reviewAction === 'rejected' && !feedback.trim())}
+                                className={`cursor-pointer px-4 py-2 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
+                                    reviewAction === 'approved'
+                                        ? 'bg-green-600 hover:bg-green-700'
+                                        : 'bg-red-600 hover:bg-red-700'
+                                }`}
+                            >
+                                {reviewing ? (
+                                    <>
+                                        <LuLoader className="w-4 h-4 animate-spin" />
+                                        <span>Đang xử lý...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        {reviewAction === 'approved' ? (
+                                            <>
+                                                <LuCheck className="w-4 h-4" />
+                                                <span>Phê duyệt</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <LuX className="w-4 h-4" />
+                                                <span>Từ chối</span>
+                                            </>
+                                        )}
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

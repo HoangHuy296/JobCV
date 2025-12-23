@@ -112,3 +112,12 @@ export const getJobApplicationStats = async (jobId: number): Promise<Application
   const response = await apiClient.get(`/job-applications/job/${jobId}/stats`);
   return response.data.result;
 };
+
+// Check if user has applied for a job
+export const checkApplicationStatus = async (jobId: number): Promise<{
+  hasApplied: boolean;
+  application: JobApplication | null;
+}> => {
+  const response = await apiClient.get(`/job-applications/check/${jobId}`);
+  return response.data.result;
+};

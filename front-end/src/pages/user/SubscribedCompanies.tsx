@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUserSubscribedCompanies, unsubscribeFromCompany, type Company } from '../../api/companyService';
 import { toast } from 'react-toastify';
+import { formatDate } from '../../utils/dateUtils';
 import { LuBell, LuBellOff, LuBuilding2, LuMapPin, LuUsers, LuBriefcase, LuLoader, LuGlobe, LuRefreshCw } from 'react-icons/lu';
 
 interface CompanyWithStats extends Company {
@@ -52,12 +53,10 @@ const SubscribedCompanies: React.FC = () => {
   };
 
   const handleViewCompany = (companyId: number) => {
-    navigate(`/cong-ty/${companyId}`);
+    const encodedCompanyId = btoa(companyId.toString());
+    navigate(`/cong-ty/${encodedCompanyId}`);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('vi-VN');
-  };
 
   if (loading) {
     return (
@@ -69,7 +68,7 @@ const SubscribedCompanies: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <>
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
@@ -133,11 +132,11 @@ const SubscribedCompanies: React.FC = () => {
                       <img
                         src={company.logo.url}
                         alt={company.name}
-                        className="h-20 w-20 object-contain rounded"
+                        className="h-28 w-28 object-cover rounded"
                       />
                     ) : (
-                      <div className="h-20 w-20 bg-gray-200 rounded flex items-center justify-center">
-                        <LuBuilding2 className="w-10 h-10 text-gray-400" />
+                      <div className="h-28 w-28 bg-gray-200 rounded flex items-center justify-center">
+                        <LuBuilding2 className="w-14 h-14 text-gray-400" />
                       </div>
                     )}
                   </div>
@@ -150,10 +149,12 @@ const SubscribedCompanies: React.FC = () => {
                   {/* Company Info */}
                   <div className="space-y-2 mb-4">
                     {/* Location */}
-                    <p className="text-sm text-gray-600 flex items-center gap-2">
-                      <LuMapPin className="w-4 h-4 flex-shrink-0" />
-                      <span className="line-clamp-1">{company.location}</span>
-                    </p>
+                    {company.location && (
+                      <p className="text-sm text-gray-600 flex items-center gap-2">
+                        <LuMapPin className="w-4 h-4 flex-shrink-0" />
+                        <span className="line-clamp-1">{company.location}</span>
+                      </p>
+                    )}
 
                     {/* Employees */}
                     {company.employees && (
@@ -164,7 +165,7 @@ const SubscribedCompanies: React.FC = () => {
                     )}
 
                     {/* Job Count */}
-                    {company.job_count !== undefined && (
+                    {company.job_count !== undefined && company.job_count > 0 && (
                       <p className="text-sm text-gray-600 flex items-center gap-2">
                         <LuBriefcase className="w-4 h-4 flex-shrink-0" />
                         {company.job_count} việc làm đang tuyển
@@ -240,7 +241,7 @@ const SubscribedCompanies: React.FC = () => {
           )}
         </>
       )}
-    </div>
+    </>
   );
 };
 

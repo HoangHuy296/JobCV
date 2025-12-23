@@ -1,5 +1,6 @@
 const Company = require('../models/Company');
 const CompanySubscription = require('../models/CompanySubscription');
+const Notification = require('../models/Notification');
 const db = require('../config/db');
 
 // Create a new company
@@ -33,6 +34,17 @@ const createCompany = async (req, res) => {
     
     // Create company
     const company = await Company.create(companyData);
+
+    try {
+      await Notification.createForAdmins({
+        title: 'Công ty mới được tạo',
+        message: `Người dùng "${req.user.name || 'Không rõ'}" đã tạo công ty "${name}".`,
+        type: 'company_created',
+        link: '/admin/quan-ly-cong-ty'
+      });
+    } catch (notificationError) {
+      console.error('Error notifying admins about new company creation:', notificationError);
+    }
     
     res.status(200).json({
       result: company, message: null
@@ -160,7 +172,7 @@ const updateCompany = async (req, res) => {
       linkedin: linkedin || existingCompany.linkedin,
       twitter: twitter || existingCompany.twitter,
       instagram: instagram || existingCompany.instagram,
-      logo_id: logo_id || (existingCompany.logo ? existingCompany.logo.id : null)
+      logo_id: logo_id !== undefined ? logo_id : (existingCompany.logo ? existingCompany.logo.id : null)
     };
     
     // Update company

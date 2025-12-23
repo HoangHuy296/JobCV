@@ -20,7 +20,7 @@ function App() {
               <AppRouter />
               <TableActionDropdown />
               <ToastContainer
-                position="top-right"
+                position="top-center"
                 autoClose={3000}
                 newestOnTop
                 closeOnClick

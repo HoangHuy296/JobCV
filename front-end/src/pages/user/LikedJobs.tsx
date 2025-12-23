@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUserLikedJobs, unlikeJob, type Job } from '../../api/jobService';
 import { toast } from 'react-toastify';
+import { formatDate } from '../../utils/dateUtils';
 import { LuHeart, LuBriefcase, LuMapPin, LuCalendar, LuDollarSign, LuLoader, LuHeartOff } from 'react-icons/lu';
 import { usePagination } from '../../hooks/usePagination';
 
@@ -24,7 +25,7 @@ const JobCard = React.memo(({
           <img
             src={job.company_logo}
             alt={job.company_name}
-            className="h-16 w-16 object-contain rounded"
+            className="h-24 w-24 object-cover rounded"
           />
         </div>
       )}
@@ -33,25 +34,33 @@ const JobCard = React.memo(({
         {job.title}
       </h3>
 
-      <p className="text-sm text-gray-600 mb-3 flex items-center gap-1">
-        <LuBriefcase className="w-4 h-4" />
-        {job.company_name}
-      </p>
+      {job.company_name && (
+        <p className="text-sm text-gray-600 mb-3 flex items-center gap-1">
+          <LuBriefcase className="w-4 h-4" />
+          {job.company_name}
+        </p>
+      )}
 
-      <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
-        <LuMapPin className="w-4 h-4" />
-        {job.location}
-      </p>
+      {job.location && (
+        <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
+          <LuMapPin className="w-4 h-4" />
+          {job.location}
+        </p>
+      )}
 
-      <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
-        <LuDollarSign className="w-4 h-4" />
-        {job.salary}
-      </p>
+      {job.salary && (
+        <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
+          <LuDollarSign className="w-4 h-4" />
+          {job.salary}
+        </p>
+      )}
 
-      <p className="text-sm text-gray-500 mb-4 flex items-center gap-1">
-        <LuCalendar className="w-4 h-4" />
-        Hạn nộp: {formatDate(job.date_end_register)}
-      </p>
+      {job.date_end_register && (
+        <p className="text-sm text-gray-500 mb-4 flex items-center gap-1">
+          <LuCalendar className="w-4 h-4" />
+          Hạn nộp: {formatDate(job.date_end_register)}
+        </p>
+      )}
 
       <div className="flex gap-2">
         <button
@@ -109,12 +118,10 @@ const LikedJobs: React.FC = () => {
   }, [currentPage, fetchLikedJobs]);
 
   const handleViewJob = useCallback((jobId: number) => {
-    navigate(`/viec-lam/${jobId}`);
+    const encodedJobId = btoa(jobId.toString());
+    navigate(`/viec-lam/${encodedJobId}`);
   }, [navigate]);
 
-  const formatDate = useCallback((dateString: string) => {
-    return new Date(dateString).toLocaleDateString('vi-VN');
-  }, []);
 
   if (loading) {
     return (
@@ -126,7 +133,7 @@ const LikedJobs: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <>
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
@@ -213,7 +220,7 @@ const LikedJobs: React.FC = () => {
           )}
         </>
       )}
-    </div>
+    </>
   );
 };
 

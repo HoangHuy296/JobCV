@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const bcrypt = require('bcrypt');
+const { getLocalTimestamp } = require('../utils/dateUtils');
 
 class User {
   constructor(id, name, email, password, role_id, is_active, image, created_at, modified_at, deleted_at, role = null) {
@@ -391,7 +392,7 @@ class User {
 
   // Create a new user
   static async create(userData) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     const dataWithTimestamps = {
       ...userData,
       created_at: timestamp,
@@ -409,7 +410,7 @@ class User {
 
   // Update a user by ID
   static async update(id, userData) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     const dataWithTimestamp = {
       ...userData,
       modified_at: timestamp
@@ -425,7 +426,7 @@ class User {
 
   // Soft delete a user by ID
   static async delete(id) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
 
     try {
       const [result] = await db.query('UPDATE users SET deleted_at = ?, deleted = TRUE WHERE id = ? AND deleted_at IS NULL AND deleted = FALSE', [timestamp, id]);

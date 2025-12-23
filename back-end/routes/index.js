@@ -933,4 +933,12 @@ router.use('/campaigns', campaignRoutes);
 const notificationRoutes = require('./notifications');
 router.use('/notifications', notificationRoutes);
 
+// CV Template routes
+const cvTemplateRoutes = require('./cvTemplates');
+router.use('/cv-templates', cvTemplateRoutes);
+
+// CV Section routes
+const cvSectionRoutes = require('./cvSections');
+router.use('/cv-sections', cvSectionRoutes);
+
 module.exports = router;

@@ -12,6 +12,7 @@ const { swaggerUi, specs } = require('./swagger');
 
 // WebSocket
 const NotificationWebSocket = require('./websocket/notificationSocket');
+const { setNotificationWS } = require('./services/notificationEmitter');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +22,7 @@ const server = http.createServer(app);
 
 // Initialize WebSocket
 const notificationWS = new NotificationWebSocket(server);
+setNotificationWS(notificationWS);
 
 // Make WebSocket instance available to routes
 app.set('notificationWS', notificationWS);

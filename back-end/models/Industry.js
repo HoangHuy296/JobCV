@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { getLocalTimestamp } = require('../utils/dateUtils');
 
 class Industry {
   constructor(id, name, created_at, modified_at, deleted_at) {
@@ -89,7 +90,7 @@ class Industry {
 
   // Create a new industry
   static async create(name) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     
     try {
       const query = 'INSERT INTO industries (name, created_at, modified_at) VALUES (?, ?, ?)';
@@ -104,7 +105,7 @@ class Industry {
 
   // Update industry
   static async update(id, name) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     
     try {
       const query = 'UPDATE industries SET name = ?, modified_at = ? WHERE id = ? AND deleted_at IS NULL AND deleted = FALSE';
@@ -119,7 +120,7 @@ class Industry {
 
   // Delete industry (soft delete)
   static async delete(id) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     
     try {
       const query = 'UPDATE industries SET deleted_at = ?, deleted = TRUE WHERE id = ? AND deleted_at IS NULL AND deleted = FALSE';

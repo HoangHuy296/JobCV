@@ -6,8 +6,10 @@
 const Job = require('../models/Job');
 const JobVersion = require('../models/JobVersion');
 const JobReview = require('../models/JobReview');
+const Notification = require('../models/Notification');
 const User = require('../models/User');
 const db = require('../config/db');
+const { validateJobInput } = require('../middleware/jobValidation');
 
 /**
  * Create a new version of a job
@@ -229,32 +231,111 @@ exports.reviewJobVersion = async (req, res) => {
       });
     }
 
+    // Check if job exists
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ result: null, message: 'Không tìm thấy công việc' });
+    }
+
     // Check if version exists
     const version = await JobVersion.findByIdAndJobId(versionId, jobId);
     if (!version) {
       return res.status(404).json({ result: null, message: 'Không tìm thấy phiên bản' });
     }
 
-    // Update the version status
-    await JobVersion.update(versionId, { status });
+    const normalizedFeedback = feedback?.trim() ? feedback.trim() : null;
 
-    // Update the review
-    await JobReview.updateByVersionAndReviewer(versionId, req.user.id, {
-      status,
-      feedback
-    });
+    // Update the version status
+    await connection.query(
+      'UPDATE job_versions SET status = ?, modified_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [status, versionId]
+    );
+
+    // Update or create review record
+    const [existingReviewRows] = await connection.query(
+      'SELECT id FROM job_reviews WHERE job_version_id = ? ORDER BY id DESC LIMIT 1',
+      [versionId]
+    );
+
+    if (existingReviewRows.length > 0) {
+      await connection.query(
+        `UPDATE job_reviews
+         SET status = ?, feedback = ?, reviewer_id = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [status, normalizedFeedback, req.user.id, existingReviewRows[0].id]
+      );
+    } else {
+      await connection.query(
+        `INSERT INTO job_reviews (job_id, job_version_id, reviewer_id, status, feedback, created_at)
+         VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+        [jobId, versionId, req.user.id, status, normalizedFeedback]
+      );
+    }
+
+    // Sync job + version live state similar to processReview
+    await connection.query(
+      'UPDATE jobs SET status = ? WHERE id = ?',
+      [status, jobId]
+    );
+
+    if (status === 'approved') {
+      await connection.query(
+        'UPDATE job_versions SET is_live = FALSE WHERE job_id = ?',
+        [jobId]
+      );
+      await connection.query(
+        'UPDATE job_versions SET is_live = TRUE WHERE id = ?',
+        [versionId]
+      );
+      await connection.query(
+        'UPDATE jobs SET current_version_id = ? WHERE id = ?',
+        [versionId, jobId]
+      );
+    } else {
+      await connection.query(
+        'UPDATE job_versions SET is_live = FALSE WHERE id = ?',
+        [versionId]
+      );
+    }
 
     await connection.commit();
 
-    res.json({
+    const responsePayload = {
       result: {
         job_id: jobId,
         version_id: versionId,
-        status: status,
-        feedback: feedback
+        status,
+        feedback: normalizedFeedback
       },
       message: null
-    });
+    };
+
+    const jobOwner = await User.findById(job.created_by);
+    if (jobOwner) {
+      const notificationTitle = status === 'approved'
+        ? 'Công việc đã được duyệt'
+        : 'Công việc bị từ chối';
+      const jobTitle = version?.title || job.title;
+      const notificationMessage = status === 'approved'
+        ? `Công việc "${jobTitle}" của bạn đã được duyệt và đăng công khai.`
+        : normalizedFeedback
+          ? `Công việc "${jobTitle}" của bạn đã bị từ chối. Lý do: ${normalizedFeedback}`
+          : `Công việc "${jobTitle}" của bạn đã bị từ chối.`;
+
+      try {
+        await Notification.create({
+          user_id: job.created_by,
+          title: notificationTitle,
+          message: notificationMessage,
+          type: status === 'approved' ? 'job_approved' : 'job_rejected',
+          link: `/recruiter/jobs/${jobId}`
+        });
+      } catch (notificationError) {
+        console.error('Error creating notification for job version review:', notificationError);
+      }
+    }
+
+    res.json(responsePayload);
 
   } catch (error) {
     await connection.rollback();
@@ -339,7 +420,7 @@ exports.updateJobVersion = async (req, res) => {
     } = req.body;
 
     // Validate input
-    const validationErrors = validateJob(req.body);
+    const validationErrors = validateJobInput(req.body);
     if (validationErrors.length > 0) {
       return res.status(400).json({ result: null, message: validationErrors.join(', ') });
     }

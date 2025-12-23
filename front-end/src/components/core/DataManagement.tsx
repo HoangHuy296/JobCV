@@ -39,6 +39,7 @@ interface DataManagementProps<T> {
     totalItems: number;
     itemsPerPage: number;
     onPageChange: (page: number) => void;
+    onItemsPerPageChange?: (itemsPerPage: number) => void;
   };
   filters?: {
     onFilter?: () => void;
@@ -245,13 +246,37 @@ const DataManagement = <T extends { id: number }>({
         {/* Pagination */}
         {pagination && (
           <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4">
-            <div className="text-sm text-gray-700">
-              Hiển thị <span className="font-medium">{(pagination.currentPage - 1) * pagination.itemsPerPage + 1}</span> đến{' '}
-              <span className="font-medium">
-                {Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)}
-              </span>{' '}
-              trong tổng số <span className="font-medium">{pagination.totalItems}</span> {title.toLowerCase()}
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-gray-700">
+                Hiển thị <span className="font-medium">{(pagination.currentPage - 1) * pagination.itemsPerPage + 1}</span> đến{' '}
+                <span className="font-medium">
+                  {Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)}
+                </span>{' '}
+                trong tổng số <span className="font-medium">{pagination.totalItems}</span> {title.toLowerCase()}
+              </div>
+              
+              {/* Items per page selector */}
+              {pagination.onItemsPerPageChange && (
+                <div className="flex items-center gap-2">
+                  <label htmlFor="items-per-page" className="text-sm text-gray-700">
+                    Số dòng:
+                  </label>
+                  <select
+                    id="items-per-page"
+                    value={pagination.itemsPerPage}
+                    onChange={(e) => pagination.onItemsPerPageChange!(Number(e.target.value))}
+                    disabled={loading || isSubmitting}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              )}
             </div>
+            
             <div className="flex space-x-2">
               <button
                 onClick={() => pagination.onPageChange(pagination.currentPage - 1)}

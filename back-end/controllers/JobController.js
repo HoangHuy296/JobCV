@@ -1,6 +1,7 @@
 const Job = require('../models/Job');
 const Company = require('../models/Company');
 const Notification = require('../models/Notification');
+const JobLike = require('../models/JobLike');
 const db = require('../config/db');
 const { sendJobClosedEmail } = require('../config/nodemailer');
 
@@ -240,7 +241,7 @@ const getJobById = async (req, res) => {
     
     res.json({
       result: job, 
-      message: 'Lấy thông tin công việc thành công'
+      message: null
     });
   } catch (error) {
     console.error('Error fetching job:', error);
@@ -713,7 +714,7 @@ const closeJob = async (req, res) => {
     
     res.status(200).json({
       result: { id: parseInt(id), is_closed: true }, 
-      message: 'Đóng công việc thành công'
+      message: null
     });
   } catch (error) {
     console.error('Error closing job:', error);

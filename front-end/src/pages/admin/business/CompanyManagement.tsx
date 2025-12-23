@@ -27,7 +27,7 @@ const CompanyManagementRefactored: React.FC = () => {
   });
 
   // Fetch companies with pagination and filtering
-  const fetchCompanies = useCallback(async (page: number = 1, reset: boolean = false) => {
+  const fetchCompanies = useCallback(async (page: number = 1, reset: boolean = false, limit?: number) => {
     try {
       setLoading(true);
       
@@ -40,7 +40,7 @@ const CompanyManagementRefactored: React.FC = () => {
       
       const response = await getAllCompanies(
         page, 
-        pagination.limit, 
+        limit ?? pagination.limit, 
         searchTerm, 
         industryFilter
       );
@@ -115,7 +115,11 @@ const CompanyManagementRefactored: React.FC = () => {
           totalPages: pagination.totalPages,
           totalItems: pagination.total,
           itemsPerPage: pagination.limit,
-          onPageChange: fetchCompanies
+          onPageChange: fetchCompanies,
+          onItemsPerPageChange: (newLimit: number) => {
+            setPagination(prev => ({ ...prev, limit: newLimit }));
+            fetchCompanies(1, false, newLimit);
+          }
         }
       : undefined;
   }, [currentPage, pagination, fetchCompanies]);
@@ -201,13 +205,16 @@ const CompanyManagementRefactored: React.FC = () => {
       } else if (typeof (updatedCompany as any).logo === 'number') {
         logoId = (updatedCompany as any).logo;
       } else if (typeof (updatedCompany as any).logo === 'string' && (updatedCompany as any).logo.trim() !== '') {
-        // If logo is a URL string, create a media record from the URL
-        try {
-          const mediaResponse = await createMediaFromUrl((updatedCompany as any).logo);
-          logoId = mediaResponse.id;
-        } catch (urlError) {
-          console.error('Error creating media from URL:', urlError);
-          toast.error('Không thể tạo logo từ URL. Vui lòng kiểm tra URL.');
+        // If logo is a URL string and different from current logo URL, create a media record from the URL
+        const currentLogoUrl = updatedCompany.logo?.url || '';
+        if ((updatedCompany as any).logo !== currentLogoUrl) {
+          try {
+            const mediaResponse = await createMediaFromUrl((updatedCompany as any).logo);
+            logoId = mediaResponse.id;
+          } catch (urlError) {
+            console.error('Error creating media from URL:', urlError);
+            toast.error('Không thể tạo logo từ URL. Vui lòng kiểm tra URL.');
+          }
         }
       }
       

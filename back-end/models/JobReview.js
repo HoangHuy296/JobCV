@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { getLocalTimestamp } = require('../utils/dateUtils');
 
 class JobReview {
   constructor(id, job_id, job_version_id, reviewer_id, status, feedback, created_at, updated_at) {
@@ -90,6 +91,30 @@ class JobReview {
         [status, currentVersionId]
       );
 
+      if (status === 'approved') {
+        // Ensure only the approved version is live
+        await connection.query(
+          'UPDATE job_versions SET is_live = FALSE WHERE job_id = ?',
+          [jobId]
+        );
+        await connection.query(
+          'UPDATE job_versions SET is_live = TRUE WHERE id = ?',
+          [currentVersionId]
+        );
+
+        // Ensure job points to the approved version
+        await connection.query(
+          'UPDATE jobs SET current_version_id = ? WHERE id = ?',
+          [currentVersionId, jobId]
+        );
+      } else {
+        // Make sure non-approved reviews do not leave the version live
+        await connection.query(
+          'UPDATE job_versions SET is_live = FALSE WHERE id = ?',
+          [currentVersionId]
+        );
+      }
+
       // Create review record
       const reviewData = {
         job_id: jobId,
@@ -97,7 +122,7 @@ class JobReview {
         reviewer_id: reviewerId,
         status,
         feedback: feedback || null,
-        created_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
+        created_at: getLocalTimestamp()
       };
 
       const [result] = await connection.query(

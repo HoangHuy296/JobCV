@@ -4,11 +4,14 @@
  */
 
 const db = require('../config/db');
+const { getNotificationWS } = require('../services/notificationEmitter');
+const { getLocalTimestamp } = require('../utils/dateUtils');
 
 class Notification {
   // Create a new notification
   static async create(notificationData) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
+    
     const data = {
       user_id: notificationData.user_id,
       title: notificationData.title,
@@ -21,7 +24,22 @@ class Notification {
 
     try {
       const [result] = await db.query('INSERT INTO notifications SET ?', data);
-      return { id: result.insertId, ...data };
+      const notification = { id: result.insertId, ...data };
+
+      const notificationWS = getNotificationWS();
+      if (notificationWS) {
+        console.log(`[NotificationModel] Broadcasting notification ${notification.id} to user ${notification.user_id} via WebSocket`);
+        const delivered = notificationWS.sendToUser(notification.user_id, notification);
+        if (delivered) {
+          console.log(`[NotificationModel] ✓ Notification ${notification.id} delivered to user ${notification.user_id}`);
+        } else {
+          console.warn(`[NotificationModel] ✗ User ${notification.user_id} not connected. Will rely on poll to deliver notification ${notification.id}`);
+        }
+      } else {
+        console.warn(`[NotificationModel] WebSocket instance unavailable. Notification ${notification.id} for user ${notification.user_id} stored only`);
+      }
+
+      return notification;
     } catch (error) {
       throw error;
     }
@@ -109,7 +127,7 @@ class Notification {
 
   // Mark notification as read
   static async markAsRead(id, userId) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     
     try {
       const [result] = await db.query(
@@ -124,7 +142,7 @@ class Notification {
 
   // Mark all notifications as read for a user
   static async markAllAsRead(userId) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     
     try {
       const [result] = await db.query(
@@ -165,7 +183,7 @@ class Notification {
 
   // Create notification for multiple users
   static async createForUsers(userIds, notificationData) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     const values = userIds.map(userId => [
       userId,
       notificationData.title,
@@ -182,6 +200,32 @@ class Notification {
         VALUES ?
       `;
       const [result] = await db.query(query, [values]);
+
+      const notificationWS = getNotificationWS();
+      if (notificationWS) {
+        console.log(`[NotificationModel] Broadcasting bulk notification to ${userIds.length} user(s) via WebSocket`);
+        userIds.forEach((userId, index) => {
+          const notification = {
+            id: null,
+            user_id: userId,
+            title: values[index][1],
+            message: values[index][2],
+            type: values[index][3],
+            link: values[index][4],
+            is_read: false,
+            created_at: values[index][6]
+          };
+          const delivered = notificationWS.sendToUser(userId, notification);
+          if (delivered) {
+            console.log(`[NotificationModel] ✓ Bulk notification delivered to user ${userId}`);
+          } else {
+            console.warn(`[NotificationModel] ✗ Bulk notification pending for user ${userId} (not connected)`);
+          }
+        });
+      } else {
+        console.warn(`[NotificationModel] WebSocket instance unavailable for bulk notification to ${userIds.length} user(s)`);
+      }
+
       return result.affectedRows;
     } catch (error) {
       throw error;

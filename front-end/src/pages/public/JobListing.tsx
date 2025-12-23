@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { toast } from 'react-toastify';
+import { formatDate } from '../../utils/dateUtils';
 import { useNavigate } from 'react-router-dom';
 import { useIndustryContext } from '../../contexts/IndustryContext';
 import { useLocationContext } from '../../contexts/LocationContext';
@@ -501,11 +503,11 @@ const JobListing: React.FC = () => {
                     {/* Header: Logo + Title + Company */}
                     <div className="flex items-start">
                       <div className="flex-shrink-0 h-16 w-16 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center border-2 border-white shadow-md">
-                        {job.company?.logo ? (
+                        {job.company_logo ? (
                           <img 
-                            src={job.company.logo} 
+                            src={job.company_logo} 
                             alt={job.company_name} 
-                            className="h-12 w-12 rounded-lg object-contain"
+                            className="h-12 w-12 rounded-lg object-cover"
                           />
                         ) : (
                           <span className="text-2xl font-bold text-blue-600 bg-white rounded-lg h-12 w-12 flex items-center justify-center">
@@ -540,7 +542,7 @@ const JobListing: React.FC = () => {
                           <svg className="mr-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
-                          <span>Hạn nộp: {new Date(job.date_end_register).toLocaleDateString('vi-VN')}</span>
+                          <span>Hạn nộp: {formatDate(job.date_end_register)}</span>
                         </span>
                       )}
                       

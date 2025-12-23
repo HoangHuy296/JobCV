@@ -5,6 +5,7 @@ const Notification = require('../models/Notification');
 const Setting = require('../models/Setting');
 const User = require('../models/User');
 const db = require('../config/db');
+const { getLocalTimestamp } = require('../utils/dateUtils');
 
 const submitForReview = async (req, res) => {
     try {
@@ -653,7 +654,7 @@ const updateReportStatus = async (req, res) => {
     const reportData = {
       status,
       admin_notes: admin_notes || null,
-      updated_at: new Date().toISOString().slice(0, 19).replace('T', ' ')
+      updated_at: getLocalTimestamp()
     };
     
     await JobReport.update(reportId, reportData);

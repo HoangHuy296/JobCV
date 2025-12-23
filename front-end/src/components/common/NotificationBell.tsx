@@ -41,9 +41,42 @@ const NotificationBell: React.FC = React.memo(() => {
   const [isConnected, setIsConnected] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const tabChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isOpenRef = useRef(isOpen);
+  const activeFilterRef = useRef(activeFilter);
+  const lastUnreadUpdateRef = useRef(0);
+
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
+
+  useEffect(() => {
+    activeFilterRef.current = activeFilter;
+  }, [activeFilter]);
+
+  const updateUnreadCount = useCallback((valueOrUpdater: number | ((prev: number) => number)) => {
+    setUnreadCount(prev => {
+      const newValue = typeof valueOrUpdater === 'function'
+        ? (valueOrUpdater as (prev: number) => number)(prev)
+        : valueOrUpdater;
+      lastUnreadUpdateRef.current = Date.now();
+      return newValue;
+    });
+  }, []);
+
+  const applyServerUnreadCount = useCallback((count: number, requestStartedAt: number) => {
+    if (requestStartedAt >= lastUnreadUpdateRef.current) {
+      lastUnreadUpdateRef.current = Date.now();
+      setUnreadCount(count);
+    }
+  }, []);
 
   // Fetch notifications based on filter
-  const fetchNotifications = useCallback(async (filter: FilterType = activeFilter, showLoading = true, updateCount = true) => {
+  const fetchNotifications = useCallback(async (
+    filter: FilterType = activeFilter,
+    showLoading = true,
+    shouldUpdateCount = true
+  ) => {
+    const requestStartedAt = Date.now();
     try {
       if (showLoading) setLoading(true);
       
@@ -51,8 +84,8 @@ const NotificationBell: React.FC = React.memo(() => {
       setNotifications(data.notifications);
       
       // Only update count if requested (to avoid duplicate calls)
-      if (updateCount) {
-        setUnreadCount(data.unreadCount);
+      if (shouldUpdateCount) {
+        applyServerUnreadCount(data.unreadCount, requestStartedAt);
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -63,7 +96,7 @@ const NotificationBell: React.FC = React.memo(() => {
         setIsChangingTab(false);
       }
     }
-  }, [activeFilter]);
+  }, [activeFilter, applyServerUnreadCount]);
 
   // Handle tab change with debouncing
   const handleTabChange = useCallback((filter: FilterType) => {
@@ -94,9 +127,10 @@ const NotificationBell: React.FC = React.memo(() => {
   useEffect(() => {
     // Fetch initial unread count
     const fetchInitialCount = async () => {
+      const requestStartedAt = Date.now();
       try {
         const count = await getUnreadCount();
-        setUnreadCount(count);
+        applyServerUnreadCount(count, requestStartedAt);
       } catch (error) {
         console.error('Error fetching initial unread count:', error);
       }
@@ -109,12 +143,19 @@ const NotificationBell: React.FC = React.memo(() => {
       console.log('New notification received:', notification);
       
       // Update unread count
-      setUnreadCount(prev => prev + 1);
+      updateUnreadCount(prev => prev + 1);
       
       // If dropdown is open and on 'all' or 'unread' filter, add to list
-      if (isOpen) {
-        if (activeFilter === 'all' || (activeFilter === 'unread' && !notification.is_read)) {
-          setNotifications(prev => [notification, ...prev]);
+      if (isOpenRef.current) {
+        const currentFilter = activeFilterRef.current;
+        if (currentFilter === 'all' || (currentFilter === 'unread' && !notification.is_read)) {
+          setNotifications(prev => {
+            const exists = prev.some(n => n.id === notification.id);
+            if (exists) {
+              return prev;
+            }
+            return [notification, ...prev];
+          });
         }
       }
       
@@ -150,7 +191,7 @@ const NotificationBell: React.FC = React.memo(() => {
         clearTimeout(tabChangeTimeoutRef.current);
       }
     };
-  }, []);
+  }, [applyServerUnreadCount, updateUnreadCount]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -169,7 +210,7 @@ const NotificationBell: React.FC = React.memo(() => {
     try {
       if (!notification.is_read) {
         await markAsRead(notification.id);
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        updateUnreadCount(prev => Math.max(0, prev - 1));
         setNotifications(prev => 
           prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
         );
@@ -190,7 +231,7 @@ const NotificationBell: React.FC = React.memo(() => {
     try {
       await markAllAsRead();
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      setUnreadCount(0);
+      updateUnreadCount(0);
       toast.success('Đã đánh dấu tất cả đã đọc');
       
       // Refresh if on unread tab
@@ -213,7 +254,7 @@ const NotificationBell: React.FC = React.memo(() => {
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
       
       if (deletedNotif && !deletedNotif.is_read) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        updateUnreadCount(prev => Math.max(0, prev - 1));
       }
       
       toast.success('Đã xóa thông báo');
@@ -221,7 +262,7 @@ const NotificationBell: React.FC = React.memo(() => {
       console.error('Error deleting notification:', error);
       toast.error('Lỗi khi xóa thông báo');
     }
-  }, [notifications]);
+  }, [notifications, updateUnreadCount]);
 
   // Memoized notification icon component
   const NotificationIcon = React.memo(({ type }: { type: string }) => {
@@ -280,7 +321,9 @@ const NotificationBell: React.FC = React.memo(() => {
 
   // Memoized time ago formatter
   const timeAgo = useCallback((dateString: string) => {
-    const date = new Date(dateString);
+    // Backend now sends local time (Vietnam UTC+7), parse as local time
+    const localDateString = dateString.replace(' ', 'T');
+    const date = new Date(localDateString);
     const now = new Date();
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 

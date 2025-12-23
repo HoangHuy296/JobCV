@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 
 interface RoleProtectedRouteProps {
@@ -14,6 +14,7 @@ const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({
   redirectPath = '/dang-nhap' 
 }) => {
   const { user, isAuthenticated, loading } = useUser();
+  const location = useLocation();
   
   // Show loading indicator while checking auth
   if (loading) {
@@ -26,7 +27,10 @@ const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({
   
   // Authentication check - redirect if not authenticated
   if (!isAuthenticated) {
-    return <Navigate to={redirectPath} replace />;
+    // Lưu URL hiện tại vào query param để redirect về sau khi login
+    const currentPath = location.pathname + location.search;
+    const loginUrl = `${redirectPath}?redirect=${encodeURIComponent(currentPath)}`;
+    return <Navigate to={loginUrl} replace />;
   }
   
   // Role check - if no roles specified, allow access

@@ -289,7 +289,7 @@ const CompanyListing: React.FC = () => {
                           <img 
                             src={company.logo.url} 
                             alt={company.name} 
-                            className="h-12 w-12 rounded-lg object-contain"
+                            className="h-12 w-12 rounded-lg object-cover"
                           />
                         ) : (
                           <span className="text-2xl font-bold text-blue-600 bg-white rounded-lg h-12 w-12 flex items-center justify-center">

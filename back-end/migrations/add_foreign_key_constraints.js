@@ -105,6 +105,19 @@ const foreignKeyConstraints = [
             ADD CONSTRAINT fk_job_likes_user_id 
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE`
   },
+  // CV Templates foreign keys
+  {
+    name: 'fk_cv_templates_created_by',
+    query: `ALTER TABLE cv_templates 
+            ADD CONSTRAINT fk_cv_templates_created_by 
+            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL`
+  },
+  {
+    name: 'fk_cvs_template_id',
+    query: `ALTER TABLE cvs 
+            ADD CONSTRAINT fk_cvs_template_id 
+            FOREIGN KEY (template_id) REFERENCES cv_templates(id) ON DELETE SET NULL`
+  },
   // Handle circular dependencies last
   {
     name: 'fk_media_created_by',

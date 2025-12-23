@@ -13,6 +13,10 @@ const SharedLogin: React.FC = () => {
   const location = useLocation();
   const { login } = useUser();
 
+  // Lấy redirect path từ query param
+  const searchParams = new URLSearchParams(location.search);
+  const redirectPath = searchParams.get('redirect');
+
   // Pre-fill email if coming from registration
   useEffect(() => {
     if (location.state?.email) {
@@ -84,7 +88,10 @@ const SharedLogin: React.FC = () => {
         if (config.roles === decodedToken.role.name) {
           await login(token);
           toast.success(config.successMessage);
-          navigate(config.successPath);
+          
+          // Redirect về trang được chỉ định hoặc dashboard mặc định
+          const targetPath = redirectPath || config.successPath;
+          navigate(targetPath, { replace: true });
         } else {
           // If not authorized, logout and show error
           authService.logout();

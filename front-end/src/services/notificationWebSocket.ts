@@ -24,11 +24,24 @@ class NotificationWebSocketService {
   private onErrorCallbacks: ErrorCallback[] = [];
 
   constructor() {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
-    // Extract host from API URL
-    const apiHost = apiUrl.replace(/^https?:\/\//, '').replace(/\/api$/, '');
-    this.url = `${wsProtocol}//${apiHost}/ws/notifications`;
+    // Use dedicated WebSocket URL from env, or construct from API base URL
+    const wsUrl = import.meta.env.VITE_WS_URL;
+    
+    if (wsUrl) {
+      // Use explicit WebSocket URL from env
+      this.url = wsUrl;
+    } else {
+      // Construct from API base URL
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:6969/api';
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      
+      // Extract host:port from API URL (e.g., 'http://localhost:6969/api' -> 'localhost:6969')
+      const apiHost = apiBaseUrl.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      
+      this.url = `${wsProtocol}//${apiHost}/ws/notifications`;
+    }
+    
+    console.log('WebSocket URL:', this.url);
   }
 
   /**

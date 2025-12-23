@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { getLocalTimestamp } = require('../utils/dateUtils');
 
 class CV {
   constructor(id, user_id, title, content, is_template, created_at, modified_at, deleted_at) {
@@ -36,7 +37,7 @@ class CV {
 
   // Create a new CV
   static async create(cvData) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     const dataWithTimestamps = {
       ...cvData,
       created_at: timestamp,
@@ -54,7 +55,7 @@ class CV {
 
   // Update a CV
   static async update(id, cvData) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     const dataWithTimestamp = {
       ...cvData,
       modified_at: timestamp
@@ -70,7 +71,7 @@ class CV {
 
   // Soft delete a CV
   static async delete(id) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
 
     try {
       const [result] = await db.query('UPDATE cvs SET deleted_at = ?, deleted = TRUE WHERE id = ? AND deleted_at IS NULL AND deleted = FALSE', [timestamp, id]);

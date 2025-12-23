@@ -78,6 +78,7 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
             { name: 'Quản lý công ty', path: '/admin/quan-ly-cong-ty', category: 'business' },
             { name: 'Quản lý ngành nghề', path: '/admin/quan-ly-nganh-nghe', category: 'business' },
             { name: 'Quản lý CV', path: '/admin/quan-ly-cv', category: 'business' },
+            { name: 'Quản lý Template CV', path: '/admin/quan-ly-template-cv', category: 'business' },
             { name: 'Cài đặt', path: '/admin/cai-dat', category: 'system' },
             { name: 'Quản lý người dùng', path: '/admin/quan-ly-nguoi-dung', category: 'system' },
             { name: 'Quản lý vai trò', path: '/admin/quan-ly-vai-tro', category: 'system' },
@@ -88,6 +89,8 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
         case 'recruiter':
           items = [
             { name: 'Bảng điều khiển', path: '/nha-tuyen-dung/bang-dieu-khien', category: 'dashboard' },
+            { name: 'Danh sách công ty', path: '/cong-ty', category: 'dashboard2' },
+            { name: 'Tin tuyển dụng', path: '/viec-lam', category: 'dashboard3' },
             { name: 'Quản lý công ty', path: '/nha-tuyen-dung/quan-ly-cong-ty', category: 'business' },
             { name: 'Quản lý tin tuyển dụng', path: '/nha-tuyen-dung/quan-ly-cong-viec', category: 'business' },
             { name: 'Quản lý chiến dịch', path: '/nha-tuyen-dung/quan-ly-chien-dich', category: 'business' },
@@ -101,7 +104,8 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
             { name: 'Tin tuyển dụng', path: '/viec-lam', category: 'job' },
             { name: 'Công việc đã thích', path: '/cong-viec-da-thich', category: 'user' },
             { name: 'Công ty theo dõi', path: '/cong-ty-theo-doi', category: 'user' },
-            { name: 'Quản lý CV', path: '/quan-ly-cv', category: 'user' },
+            { name: 'Tạo CV mới', path: '/quan-ly-cv', category: 'user' },
+            { name: 'Đơn ứng tuyển', path: '/don-ung-tuyen', category: 'user' },
           ];
       }
     }
@@ -182,6 +186,11 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
     setIsProfileDropdownOpen(false);
   }, []);
 
+  const handleProfileNavigation = useCallback((path: string) => {
+    navigate(path);
+    setIsProfileDropdownOpen(false);
+  }, [navigate]);
+
   // Handle profile update
   const handleProfileUpdate = useCallback(async (values: Record<string, any>) => {
     setIsProfileSubmitting(true);
@@ -250,9 +259,7 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
   const handleDashboardNavigate = useCallback(() => {
     const path = user?.role === 'admin' 
       ? '/admin/bang-dieu-khien' 
-      : user?.role === 'recruiter' 
-        ? '/nha-tuyen-dung/bang-dieu-khien' 
-        : '/';
+      : '/';
     navigate(path);
   }, [user, navigate]);
 
@@ -261,8 +268,8 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
       {/* Navbar */}
       <nav className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            {/* Logo/Title */}
+          <div className="flex items-center justify-between h-16">
+            {/* Logo/Title - Left Section */}
             <div className="flex items-center">
               <div 
                 className="flex items-center space-x-2 cursor-pointer group"
@@ -289,120 +296,145 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
               </div>
             </div>
 
-            {/* Mobile menu button */}
-            <div className="flex md:hidden items-center">
-              <button
-                onClick={toggleMobileMenu}
-                className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 cursor-pointer"
-                aria-expanded="false"
-              >
-                <span className="sr-only">Open main menu</span>
-                <svg className="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                  {isMobileMenuOpen ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-                  )}
-                </svg>
-              </button>
-            </div>
-
-            {/* Desktop Navigation Links */}
-            <div className="hidden md:flex items-center space-x-1 lg:space-x-2">              
-              {/* Role-based Navigation */}
-              {Object.entries(groupedNavItems).map(([category, items]) => (
-                items.length === 1 ? (
-                  // Single item - show as regular link
-                  <button
-                    key={items[0].path}
-                    onClick={() => handleSingleItemNavigate(items[0].path)}
-                    className={`cursor-pointer px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${location.pathname === items[0].path ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
-                  >
-                    {items[0].name}
-                  </button>
-                ) : (
-                  // Multiple items - show as dropdown
-                  <div 
-                    key={category} 
-                    className="relative"
-                    ref={(el) => {
-                      if (el) {
-                        dropdownRefs.current[category] = el;
-                      }
-                    }}
-                  >
-                    <button 
-                      className="cursor-pointer px-2 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 flex items-center transition-colors duration-200"
-                      onClick={() => toggleDropdown(category)}
-                      aria-haspopup="true"
-                      aria-expanded={openDropdown === category}
+            {/* Desktop Navigation Links - Center Section */}
+            <div className="flex items-center">
+              <div className="hidden md:flex items-center space-x-1 lg:space-x-2 flex-1 justify-center">              
+                {/* Role-based Navigation */}
+                {Object.entries(groupedNavItems).map(([category, items]) => (
+                  items.length === 1 ? (
+                    // Single item - show as regular link
+                    <button
+                      key={items[0].path}
+                      onClick={() => handleSingleItemNavigate(items[0].path)}
+                      className={`cursor-pointer px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${location.pathname === items[0].path ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
                     >
-                      {getCategoryName(category)}
-                      <svg className={`ml-1 w-4 h-4 transition-transform duration-300 ease-in-out ${openDropdown === category ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                      </svg>
+                      {items[0].name}
                     </button>
+                  ) : (
+                    // Multiple items - show as dropdown
                     <div 
-                      className={`absolute left-1/2 transform -translate-x-1/2 mt-2 w-56 rounded-lg shadow-xl bg-white z-50 transition-all duration-300 ease-in-out origin-top ${openDropdown === category ? 'opacity-100 visible scale-100 translate-y-0' : 'opacity-0 invisible scale-95 -translate-y-2'}`}
+                      key={category} 
+                      className="relative"
+                      ref={(el) => {
+                        if (el) {
+                          dropdownRefs.current[category] = el;
+                        }
+                      }}
                     >
-                      <div className="py-2">
-                        {items.map((item) => (
-                          <button
-                            key={item.path}
-                            onClick={() => handleNavigate(item.path)}
-                            className={`cursor-pointer block w-full text-left px-4 py-2.5 text-sm font-medium transition-all duration-200 ${location.pathname === item.path ? 'text-blue-600 bg-blue-50 shadow-inner' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
-                          >
-                            {item.name}
-                          </button>
-                        ))}
+                      <button 
+                        className="cursor-pointer px-2 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 flex items-center transition-colors duration-200"
+                        onClick={() => toggleDropdown(category)}
+                        aria-haspopup="true"
+                        aria-expanded={openDropdown === category}
+                      >
+                        {getCategoryName(category)}
+                        <svg className={`ml-1 w-4 h-4 transition-transform duration-300 ease-in-out ${openDropdown === category ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                      </button>
+                      <div 
+                        className={`absolute left-1/2 transform -translate-x-1/2 mt-2 w-56 rounded-lg shadow-xl bg-white z-50 transition-all duration-300 ease-in-out origin-top ${openDropdown === category ? 'opacity-100 visible scale-100 translate-y-0' : 'opacity-0 invisible scale-95 -translate-y-2'}`}
+                      >
+                        <div className="py-2">
+                          {items.map((item) => (
+                            <button
+                              key={item.path}
+                              onClick={() => handleNavigate(item.path)}
+                              className={`cursor-pointer block w-full text-left px-4 py-2.5 text-sm font-medium transition-all duration-200 ${location.pathname === item.path ? 'text-blue-600 bg-blue-50 shadow-inner' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                            >
+                              {item.name}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              ))}
-            </div>
+                  )
+                ))}
+              </div>
 
-            {/* User Profile Dropdown */}
-            <div className="flex items-center gap-3">
-              {/* Notification Bell */}
-              <NotificationBell />
-              
-              <div className="relative" ref={profileDropdownRef}>
-                <button
-                  onClick={() => setIsProfileDropdownOpen(prev => !prev)}
-                  className="cursor-pointer flex items-center text-sm"
-                >
-                  <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
-                    {user?.name?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                  <span className="ml-2 text-sm font-medium text-gray-700 hidden md:block">
-                    {user?.name}
-                  </span>
-                  <svg className={`ml-1 w-4 h-4 transition-transform duration-300 ease-in-out ${isProfileDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                  </svg>
-                </button>
+              <div className="h-6 w-px bg-gray-200 mx-2"></div>
 
-                {/* Dropdown menu */}
-                <div className={`origin-top-right absolute right-0 mt-2 w-48 rounded-lg shadow-xl bg-white z-50 transition-all duration-300 ease-in-out ${isProfileDropdownOpen ? 'opacity-100 visible scale-100 translate-y-0' : 'opacity-0 invisible scale-95 -translate-y-2'}`}>
-                  <div className="py-2" role="none">
-                    <button
-                      onClick={handleProfileClick}
-                      className="block w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 cursor-pointer transition-all duration-200"
-                      role="menuitem"
-                    >
-                      Hồ sơ cá nhân
-                    </button>
-                    <button
-                      onClick={handleLogout}
-                      className="block w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 cursor-pointer transition-all duration-200"
-                      role="menuitem"
-                    >
-                      Đăng xuất
-                    </button>
+              {/* User Profile Dropdown - Right Section */}
+              <div className="flex items-center gap-3">
+                {/* Notification Bell - Desktop Only */}
+                <div className="hidden md:block">
+                  <NotificationBell />
+                </div>
+                
+                {/* User Profile - Desktop Only */}
+                <div className="hidden md:block relative" ref={profileDropdownRef}>
+                  <button
+                    onClick={() => setIsProfileDropdownOpen(prev => !prev)}
+                    className="cursor-pointer flex items-center text-sm"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
+                      {user?.name?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    <span className="ml-2 text-sm font-medium text-gray-700">
+                      {user?.name}
+                    </span>
+                    <svg className={`ml-1 w-4 h-4 transition-transform duration-300 ease-in-out ${isProfileDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </button>
+
+                  {/* Dropdown menu */}
+                  <div className={`origin-top-right absolute right-0 mt-2 w-48 rounded-lg shadow-xl bg-white z-50 transition-all duration-300 ease-in-out ${isProfileDropdownOpen ? 'opacity-100 visible scale-100 translate-y-0' : 'opacity-0 invisible scale-95 -translate-y-2'}`}>
+                    <div className="py-2" role="none">
+                      {user?.role === 'recruiter' && (
+                        <>
+                          <button
+                            onClick={() => handleProfileNavigation('/nha-tuyen-dung/quan-ly-cong-ty')}
+                            className="block w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 cursor-pointer transition-all duration-200"
+                            role="menuitem"
+                          >
+                            Quản lý công ty
+                          </button>
+                          <button
+                            onClick={() => handleProfileNavigation('/nha-tuyen-dung/quan-ly-cong-viec')}
+                            className="block w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 cursor-pointer transition-all duration-200"
+                            role="menuitem"
+                          >
+                            Quản lý tin tuyển dụng
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={handleProfileClick}
+                        className="block w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 cursor-pointer transition-all duration-200"
+                        role="menuitem"
+                      >
+                        Hồ sơ cá nhân
+                      </button>
+                      <button
+                        onClick={handleLogout}
+                        className="block w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 cursor-pointer transition-all duration-200"
+                        role="menuitem"
+                      >
+                        Đăng xuất
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+
+                {/* Mobile menu button */}
+                <div className="md:hidden">
+                  <button
+                    onClick={toggleMobileMenu}
+                    className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 cursor-pointer"
+                    aria-expanded="false"
+                  >
+                    <span className="sr-only">Open main menu</span>
+                    <svg className="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                      {isMobileMenuOpen ? (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      ) : (
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                      )}
+                    </svg>
+                  </button>
+                </div>
+              </div>              
             </div>
           </div>
         </div>

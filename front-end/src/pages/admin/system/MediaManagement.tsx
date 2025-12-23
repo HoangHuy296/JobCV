@@ -19,7 +19,7 @@ const MediaManagement: React.FC = () => {
   });
 
   // Optimized fetch function with useCallback
-  const fetchData = useCallback(async (page: number = 1, reset: boolean = false) => {
+  const fetchData = useCallback(async (page: number = 1, reset: boolean = false, limit?: number) => {
     try {
       setLoading(true);
       
@@ -29,7 +29,9 @@ const MediaManagement: React.FC = () => {
         page = 1;
       }
       
-      const mediaResponse = await getAllMedia(page, pagination.limit, reset ? '' : searchTerm);
+      const mediaResponse = await getAllMedia(
+        page, 
+        limit ?? pagination.limit, reset ? '' : searchTerm);
       
       setMediaList(mediaResponse.media);
       setPagination(mediaResponse.pagination);
@@ -50,7 +52,11 @@ const MediaManagement: React.FC = () => {
           totalPages: pagination.totalPages,
           totalItems: pagination.total,
           itemsPerPage: pagination.limit,
-          onPageChange: fetchData
+          onPageChange: fetchData,
+          onItemsPerPageChange: (newLimit: number) => {
+            setPagination(prev => ({ ...prev, limit: newLimit }));
+            fetchData(1, false, newLimit);
+          }
         }
       : undefined;
   }, [currentPage, pagination, fetchData]);

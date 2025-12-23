@@ -12,6 +12,8 @@ const SharedRegister: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -56,6 +58,29 @@ const SharedRegister: React.FC = () => {
     navigate(loginPath, { state: { email: registeredEmail } });
   };
 
+  const handleResendVerification = async () => {
+    if (!registeredEmail) {
+      return;
+    }
+
+    setResendLoading(true);
+
+    try {
+      const response = await authService.resendVerification(registeredEmail);
+
+      if (response?.result) {
+        setResendSuccess(true);
+        toast.success('Email xác thực đã được gửi lại!');
+      }
+    } catch (error: any) {
+      console.error('Resend verification failed:', error);
+      const message = error?.response?.data?.message || 'Không thể gửi lại email xác thực';
+      toast.error(message);
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   // Show success message after registration
   if (registrationSuccess) {
     return (
@@ -92,6 +117,31 @@ const SharedRegister: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {registeredEmail && (
+          <div className="bg-white border border-blue-200 rounded-lg p-6 shadow-sm">
+            <h4 className="text-base font-semibold text-gray-900 mb-2">
+              Không nhận được email?
+            </h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Nhấn nút bên dưới để chúng tôi gửi lại email xác thực tới
+              {' '}
+              <strong className="text-blue-600">{registeredEmail}</strong>.
+            </p>
+            <button
+              onClick={handleResendVerification}
+              disabled={resendLoading}
+              className="cursor-pointer flex w-full justify-center items-center rounded-md border border-transparent px-4 py-3 text-base font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 disabled:opacity-60"
+            >
+              {resendLoading ? 'Đang gửi...' : 'Gửi lại email xác thực'}
+            </button>
+            {resendSuccess && (
+              <p className="mt-3 text-sm text-green-600">
+                Email xác thực đã được gửi lại thành công. Vui lòng kiểm tra hộp thư của bạn.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="space-y-3">
           <button

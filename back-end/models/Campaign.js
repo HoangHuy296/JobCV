@@ -4,11 +4,12 @@
  */
 
 const db = require('../config/db');
+const { getLocalTimestamp } = require('../utils/dateUtils');
 
 class Campaign {
   // Create a new campaign
   static async create(campaignData) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     const data = {
       ...campaignData,
       created_at: timestamp,
@@ -67,7 +68,7 @@ class Campaign {
 
   // Update campaign
   static async update(id, campaignData) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     const data = {
       ...campaignData,
       modified_at: timestamp
@@ -86,7 +87,7 @@ class Campaign {
 
   // Soft delete campaign
   static async delete(id) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
 
     try {
       const [result] = await db.query(

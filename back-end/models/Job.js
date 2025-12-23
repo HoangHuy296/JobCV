@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { getLocalTimestamp } = require('../utils/dateUtils');
 
 class Job {
   constructor(id, title, brief_description, requirement, benefits, salary, date_end_register, years_experienced, work_hours, company_id, industry_id, location, created_by, created_at, modified_at, deleted_at, deleted, current_version_id, version_count) {
@@ -25,7 +26,7 @@ class Job {
 
   // Create a new job
   static async create(jobData) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     const dataWithTimestamps = {
       ...jobData,
       created_at: timestamp,
@@ -76,7 +77,7 @@ class Job {
 
   // Update a job by ID
   static async update(id, jobData) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     const dataWithTimestamp = {
       ...jobData,
       modified_at: timestamp
@@ -92,7 +93,7 @@ class Job {
 
   // Soft delete a job by ID
   static async delete(id) {
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
 
     try {
       const [result] = await db.query('UPDATE jobs SET deleted_at = ?, deleted = TRUE WHERE id = ? AND deleted_at IS NULL AND deleted = FALSE', [timestamp, id]);
@@ -125,12 +126,14 @@ class Job {
     let query = `
       SELECT j.*,
              c.name as company_name,
+             m.url as company_logo,
              i.name as industry_name,
              jv.version_number,
              jv.status as version_status,
              u.name as creator_name
       FROM jobs j
       LEFT JOIN companies c ON j.company_id = c.id
+      LEFT JOIN media m ON c.logo_id = m.id
       LEFT JOIN industries i ON j.industry_id = i.id
       LEFT JOIN job_versions jv ON j.current_version_id = jv.id
       LEFT JOIN users u ON j.created_by = u.id

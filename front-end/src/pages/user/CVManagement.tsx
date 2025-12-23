@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getUserCVs, uploadCV, deleteCV, downloadCV, checkCVInApplications, type CV } from '../../api/cvService';
 import { toast } from 'react-toastify';
+import { formatDateLong } from '../../utils/dateUtils';
 import { 
   LuFileText, 
   LuUpload, 
@@ -9,11 +11,15 @@ import {
   LuLoader,
   LuFile,
   LuCalendar,
-  LuX
+  LuX,
+  LuPlus,
+  LuEye
 } from 'react-icons/lu';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import TemplateSelectionModal from '../../components/cv/TemplateSelectionModal';
 
 const CVManagement: React.FC = () => {
+  const navigate = useNavigate();
   const [cvs, setCvs] = useState<CV[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -30,6 +36,7 @@ const CVManagement: React.FC = () => {
     title: '',
     file: null as File | null
   });
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [cvToDelete, setCvToDelete] = useState<number | null>(null);
   const [affectedApplications, setAffectedApplications] = useState<Array<{
@@ -39,6 +46,9 @@ const CVManagement: React.FC = () => {
     status: string;
   }>>([]);
   const [checkingApplications, setCheckingApplications] = useState(false);
+  const [imagePreviewModal, setImagePreviewModal] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
 
   const fetchCVs = useCallback(async (page: number = 1, search: string = '') => {
     try {
@@ -92,6 +102,12 @@ const CVManagement: React.FC = () => {
         return;
       }
 
+      // Create preview URL for images and PDFs
+      if (filePreviewUrl) {
+        URL.revokeObjectURL(filePreviewUrl);
+      }
+      const previewUrl = URL.createObjectURL(file);
+      setFilePreviewUrl(previewUrl);
       setUploadData(prev => ({ ...prev, file }));
     }
   };
@@ -118,6 +134,10 @@ const CVManagement: React.FC = () => {
       toast.success('Tải CV lên thành công');
       setIsUploadModalOpen(false);
       setUploadData({ title: '', file: null });
+      if (filePreviewUrl) {
+        URL.revokeObjectURL(filePreviewUrl);
+        setFilePreviewUrl(null);
+      }
       fetchCVs(currentPage, searchTerm);
     } catch (error) {
       console.error('Error uploading CV:', error);
@@ -190,13 +210,6 @@ const CVManagement: React.FC = () => {
     return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('vi-VN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
 
   const getFileTypeInfo = (fileName?: string, mimeType?: string) => {
     if (!fileName && !mimeType) return { icon: LuFile, color: 'blue', label: 'File' };
@@ -219,6 +232,13 @@ const CVManagement: React.FC = () => {
     return { icon: LuFile, color: 'gray', label: 'File' };
   };
 
+  const handleViewImage = (cv: CV) => {
+    if (cv.file_url) {
+      setPreviewImageUrl(cv.file_url);
+      setImagePreviewModal(true);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -227,13 +247,22 @@ const CVManagement: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Quản lý CV</h1>
           <p className="text-gray-600 mt-1">Quản lý và tải lên CV của bạn</p>
         </div>
-        <button
-          onClick={() => setIsUploadModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-        >
-          <LuUpload className="w-5 h-5" />
-          Tải CV lên
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowTemplateModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer"
+          >
+            <LuPlus className="w-5 h-5" />
+            Tạo CV mới
+          </button>
+          <button
+            onClick={() => setIsUploadModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+          >
+            <LuUpload className="w-5 h-5" />
+            Tải CV lên
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -270,62 +299,101 @@ const CVManagement: React.FC = () => {
           {cvs.map((cv) => (
             <div
               key={cv.id}
-              className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6 border border-gray-200"
+              className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-200 flex flex-col"
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  {(() => {
+              {/* CV Preview/Thumbnail */}
+              <div className="w-full h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
+                {cv.file_url ? (
+                  (() => {
                     const fileInfo = getFileTypeInfo(cv.file_name, cv.mime_type);
+                    
+                    // Show image preview for image files
+                    if (fileInfo.label === 'Image') {
+                      return (
+                        <div 
+                          className="w-full h-full cursor-pointer relative group"
+                          onClick={() => handleViewImage(cv)}
+                        >
+                          <img
+                            src={cv.file_url}
+                            alt={cv.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.parentElement!.innerHTML = '<div class="flex flex-col items-center justify-center"><svg class="w-16 h-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg><p class="text-xs text-gray-500 mt-2">Image</p></div>';
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-70 transition-all flex items-center justify-center">
+                            <LuEye className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        </div>
+                      );
+                    }
+                    // Show PDF preview for PDF files
+                    if (fileInfo.label === 'PDF') {
+                      return (
+                        <embed
+                          src={cv.file_url}
+                          type="application/pdf"
+                          className="w-full h-full"
+                        />
+                      );
+                    }
+                    // Show icon for Word files
                     const FileIcon = fileInfo.icon;
-                    const bgColor = `bg-${fileInfo.color}-100`;
-                    const textColor = `text-${fileInfo.color}-600`;
                     return (
-                      <div className={`w-12 h-12 ${bgColor} rounded-lg flex items-center justify-center`}>
-                        <FileIcon className={`w-6 h-6 ${textColor}`} />
+                      <div className="flex flex-col items-center justify-center">
+                        <FileIcon className="w-16 h-16 text-gray-400" />
+                        <p className="text-xs text-gray-500 mt-2">{fileInfo.label}</p>
                       </div>
                     );
-                  })()}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">{cv.title}</h3>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full bg-${getFileTypeInfo(cv.file_name, cv.mime_type).color}-100 text-${getFileTypeInfo(cv.file_name, cv.mime_type).color}-700`}>
-                        {getFileTypeInfo(cv.file_name, cv.mime_type).label}
-                      </span>
-                      <p className="text-sm text-gray-500">{formatFileSize(cv.file_size)}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <LuCalendar className="w-4 h-4" />
-                  <span>{formatDate(cv.created_at)}</span>
-                </div>
-                {cv.file_name && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <LuFileText className="w-4 h-4" />
-                    <span className="truncate">{cv.file_name}</span>
-                  </div>
+                  })()
+                ) : (
+                  <LuFileText className="w-16 h-16 text-gray-400" />
                 )}
               </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleDownload(cv)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
-                  title="Tải xuống"
-                >
-                  <LuDownload className="w-4 h-4" />
-                  <span className="text-sm font-medium">Tải xuống</span>
-                </button>
-                <button
-                  onClick={() => handleDeleteClick(cv.id)}
-                  className="flex items-center justify-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors cursor-pointer"
-                  title="Xóa"
-                >
-                  <LuTrash2 className="w-4 h-4" />
-                </button>
+              {/* CV Info */}
+              <div className="p-6 flex flex-col flex-1">
+                <div className="mb-4">
+                  <h3 className="font-semibold text-gray-900 truncate mb-2">{cv.title}</h3>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full bg-${getFileTypeInfo(cv.file_name, cv.mime_type).color}-100 text-${getFileTypeInfo(cv.file_name, cv.mime_type).color}-700`}>
+                      {getFileTypeInfo(cv.file_name, cv.mime_type).label}
+                    </span>
+                    <p className="text-sm text-gray-500">{formatFileSize(cv.file_size)}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 mb-4">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <LuCalendar className="w-4 h-4" />
+                  <span>{formatDateLong(cv.created_at)}</span>
+                </div>
+                  {cv.file_name && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <LuFileText className="w-4 h-4" />
+                      <span className="truncate">{cv.file_name}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2 mt-auto">
+                  <button
+                    onClick={() => handleDownload(cv)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer font-medium"
+                  >
+                    <LuDownload className="w-4 h-4" />
+                    Tải xuống
+                  </button>
+                  <button
+                    onClick={() => handleDeleteClick(cv.id)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer font-medium"
+                  >
+                    <LuTrash2 className="w-4 h-4" />
+                    Xóa CV
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -358,13 +426,17 @@ const CVManagement: React.FC = () => {
       {/* Upload Modal */}
       {isUploadModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Tải CV lên</h2>
               <button
                 onClick={() => {
                   setIsUploadModalOpen(false);
                   setUploadData({ title: '', file: null });
+                  if (filePreviewUrl) {
+                    URL.revokeObjectURL(filePreviewUrl);
+                    setFilePreviewUrl(null);
+                  }
                 }}
                 className="text-gray-400 hover:text-gray-600 cursor-pointer"
               >
@@ -416,12 +488,48 @@ const CVManagement: React.FC = () => {
                 </div>
               </div>
 
+              {/* File Preview */}
+              {uploadData.file && filePreviewUrl && (
+                <div className="border border-gray-300 rounded-lg p-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Xem trước
+                  </label>
+                  {uploadData.file.type.startsWith('image/') ? (
+                    <div className="flex justify-center">
+                      <img
+                        src={filePreviewUrl}
+                        alt="Preview"
+                        className="max-h-64 rounded-lg object-contain"
+                      />
+                    </div>
+                  ) : uploadData.file.type === 'application/pdf' ? (
+                    <div className="w-full h-64 border border-gray-200 rounded-lg overflow-hidden">
+                      <embed
+                        src={filePreviewUrl}
+                        type="application/pdf"
+                        className="w-full h-full"
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <LuFileText className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                      <p className="text-sm">Không thể xem trước file Word</p>
+                      <p className="text-xs mt-1">File: {uploadData.file.name}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => {
                     setIsUploadModalOpen(false);
                     setUploadData({ title: '', file: null });
+                    if (filePreviewUrl) {
+                      URL.revokeObjectURL(filePreviewUrl);
+                      setFilePreviewUrl(null);
+                    }
                   }}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
                   disabled={uploading}
@@ -451,6 +559,27 @@ const CVManagement: React.FC = () => {
         </div>
       )}
 
+      {/* Image Preview Modal */}
+      {imagePreviewModal && (
+        <div className="fixed inset-0 bg-black flex items-center justify-center z-50 p-4" onClick={() => setImagePreviewModal(false)}>
+          <div className="relative max-w-6xl max-h-[90vh] w-full h-full flex items-center justify-center">
+            <button
+              onClick={() => setImagePreviewModal(false)}
+              className="absolute top-4 right-0 p-2 bg-white rounded-full text-gray-700 hover:bg-gray-100 transition-colors z-10"
+              title="Đóng"
+            >
+              <LuX className="w-6 h-6" />
+            </button>
+            <img
+              src={previewImageUrl || ''}
+              alt="CV Preview"
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Confirm Delete Modal */}
       <ConfirmModal
         isOpen={showConfirmDelete}
@@ -465,6 +594,13 @@ const CVManagement: React.FC = () => {
         confirmText="Xóa"
         cancelText="Hủy"
         type="danger"
+      />
+
+      {/* Template Selection Modal */}
+      <TemplateSelectionModal
+        isOpen={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        onSuccess={() => fetchCVs(currentPage, searchTerm)}
       />
     </div>
   );

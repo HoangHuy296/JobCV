@@ -5,6 +5,7 @@ export interface CV {
   user_id: number;
   title: string;
   file_path?: string;
+  file_url?: string; 
   file_name?: string;
   file_size?: number;
   mime_type?: string;
@@ -111,3 +112,15 @@ export const createTemplateFromCV = async (cvId: number, title: string): Promise
   const response = await api.post('/cvs/create-template', { cvId, title });
   return response.data.result.templateId;
 };
+
+// DEPRECATED: Use cvTemplateService.createCVFromTemplate instead
+// This endpoint /cvs/from-template doesn't exist anymore
+// export const createCVFromTemplate = async (data: {
+//   template_id: number;
+//   title: string;
+//   data: Record<string, any>;
+//   is_public?: boolean;
+// }): Promise<CV> => {
+//   const response = await api.post('/cvs/from-template', data);
+//   return response.data.result.cv;
+// };

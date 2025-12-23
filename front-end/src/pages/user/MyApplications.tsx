@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getMyApplications, withdrawApplication, type JobApplication } from '../../api/jobApplicationService';
 import { toast } from 'react-toastify';
+import { formatDate } from '../../utils/dateUtils';
 import {
   LuBriefcase,
   LuBuilding2,
@@ -97,7 +98,7 @@ const MyApplications: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Đơn ứng tuyển của tôi</h1>
@@ -163,7 +164,7 @@ const MyApplications: React.FC = () => {
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <LuCalendar className="w-4 h-4" />
                         <span>
-                          Hạn: {new Date(app.date_end_register).toLocaleDateString('vi-VN')}
+                          Hạn: {formatDate(app.date_end_register)}
                         </span>
                       </div>
                     )}
@@ -174,7 +175,7 @@ const MyApplications: React.FC = () => {
                     <div className="flex items-center gap-2 text-gray-600">
                       <LuClock className="w-4 h-4" />
                       <span>
-                        Ứng tuyển: {new Date(app.applied_at).toLocaleDateString('vi-VN')}
+                        Ứng tuyển: {formatDate(app.applied_at)}
                       </span>
                     </div>
                     {app.cv_title && (
@@ -257,7 +258,7 @@ const MyApplications: React.FC = () => {
           </button>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

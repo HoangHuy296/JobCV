@@ -178,7 +178,11 @@ const IndustryManagement: React.FC = () => {
           totalPages: pagination.totalPages,
           totalItems: pagination.total,
           itemsPerPage: pagination.limit,
-          onPageChange: setCurrentPage
+          onPageChange: setCurrentPage,
+          onItemsPerPageChange: (newLimit: number) => {
+            setPagination(prev => ({ ...prev, limit: newLimit }));
+            setCurrentPage(1);
+          }
         }
       : undefined;
   }, [currentPage, pagination]);

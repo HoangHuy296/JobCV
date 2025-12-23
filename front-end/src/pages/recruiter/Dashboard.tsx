@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useUser } from '../../contexts/UserContext';
 import { createCompany, updateCompany, type CreateCompanyData } from '../../api/companyService';
+import { createJob, type CreateJobData } from '../../api/jobService';
 import IndustrySelect from '../../components/common/IndustrySelect';
 import LocationSelect from '../../components/common/LocationSelect';
 import { toast } from 'react-toastify';
 import CompanyForm from './company/CompanyForm';
+import JobForm from './job/JobForm';
 import QuillEditor from '../../components/common/QuillEditor';
 
 const RecruiterDashboard: React.FC = () => {
@@ -23,6 +25,8 @@ const RecruiterDashboard: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompanyFormOpen, setIsCompanyFormOpen] = useState(false);
+  const [isJobFormOpen, setIsJobFormOpen] = useState(false);
+  const [isJobSubmitting, setIsJobSubmitting] = useState(false);
 
   // Fetch industries on component mount
   useEffect(() => {
@@ -156,6 +160,46 @@ const RecruiterDashboard: React.FC = () => {
     }
   }, [company]);
   
+  const handleCreateJob = useCallback(async (values: Record<string, any>) => {
+    if (!company?.id) {
+      toast.error('Vui lòng tạo công ty trước khi đăng tin tuyển dụng');
+      return;
+    }
+    
+    setIsJobSubmitting(true);
+    
+    try {
+      const jobData: CreateJobData = {
+        title: values.title,
+        brief_description: values.brief_description,
+        requirement: values.requirement,
+        benefits: values.benefits || '',
+        salary: values.salary || '',
+        date_end_register: values.date_end_register || '',
+        years_experienced: values.years_experienced || 0,
+        work_hours: values.work_hours || '',
+        industry_id: values.industry_id,
+        location: values.location,
+        max_applicants: values.max_applicants || null,
+        auto_close_on_threshold: values.auto_close_on_threshold || false,
+        status: values.is_published ? 'pending_review' : 'draft',
+        company_id: company.id
+      };
+      
+      const response = await createJob(jobData);
+      
+      if (response) {
+        toast.success('Đăng tin tuyển dụng thành công');
+        setIsJobFormOpen(false);
+      }
+    } catch (error) {
+      console.error('Error creating job:', error);
+      toast.error('Có lỗi xảy ra khi đăng tin tuyển dụng');
+    } finally {
+      setIsJobSubmitting(false);
+    }
+  }, [company]);
+  
   // Memoize the CompanyForm component to prevent unnecessary re-renders
   const companyFormComponent = useMemo(() => {
     if (!isCompanyFormOpen) return null;
@@ -170,6 +214,20 @@ const RecruiterDashboard: React.FC = () => {
       />
     );
   }, [isCompanyFormOpen, company, isSubmitting, handleEditCompany]);
+  
+  // Memoize the JobForm component to prevent unnecessary re-renders
+  const jobFormComponent = useMemo(() => {
+    if (!isJobFormOpen) return null;
+    
+    return (
+      <JobForm
+        isOpen={isJobFormOpen}
+        onClose={() => setIsJobFormOpen(false)}
+        onSubmit={handleCreateJob}
+        isSubmitting={isJobSubmitting}
+      />
+    );
+  }, [isJobFormOpen, isJobSubmitting, handleCreateJob]);
 
   if (companyLoading) {
     return (
@@ -454,10 +512,12 @@ const RecruiterDashboard: React.FC = () => {
             <h2 className="text-lg font-semibold text-gray-900">Đăng tin tuyển dụng</h2>
           </div>
           <p className="text-gray-700 mb-4">Tạo và quản lý các vị trí tuyển dụng của công ty bạn.</p>
-          <button className="text-green-600 hover:text-green-800 font-medium flex items-center cursor-pointer">
+          <button onClick={() => setIsJobFormOpen(true)} className="text-green-600 hover:text-green-800 font-medium flex items-center cursor-pointer">
             Đăng tin mới <span className="ml-1">→</span>
           </button>
         </div>
+        
+        {jobFormComponent}
         
         <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl shadow-sm p-6 hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
           <div className="flex items-center mb-4">

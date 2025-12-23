@@ -5,6 +5,7 @@
 
 const BaseModel = require('./BaseModel');
 const db = require('../config/db');
+const { getLocalTimestamp } = require('../utils/dateUtils');
 
 class JobVersion extends BaseModel {
   constructor() {
@@ -16,7 +17,7 @@ class JobVersion extends BaseModel {
    */
   async create(versionData) {
     // Add timestamps
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     const data = {
       job_id: versionData.job_id,
       version_number: versionData.version_number,
@@ -144,7 +145,7 @@ class JobVersion extends BaseModel {
     }
 
     // Add modified_at timestamp
-    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const timestamp = getLocalTimestamp();
     filteredData.modified_at = timestamp;
 
     // Use direct db.query instead of BaseModel's update to avoid potential 'deleted' field issues
