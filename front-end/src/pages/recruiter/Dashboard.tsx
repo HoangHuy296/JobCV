@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../contexts/UserContext';
 import { createCompany, updateCompany, type CreateCompanyData } from '../../api/companyService';
 import { createJob, type CreateJobData } from '../../api/jobService';
+import { uploadMedia, createMediaFromUrl } from '../../api/mediaService';
 import IndustrySelect from '../../components/common/IndustrySelect';
 import LocationSelect from '../../components/common/LocationSelect';
 import { toast } from 'react-toastify';
@@ -10,6 +12,7 @@ import JobForm from './job/JobForm';
 import QuillEditor from '../../components/common/QuillEditor';
 
 const RecruiterDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const { user, company, setCompany, companyLoading } = useUser();
   const initialFormData = useMemo(() => ({
     name: '',
@@ -142,23 +145,53 @@ const RecruiterDashboard: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      // Update user profile
       if (company) {
-        const resp = await updateCompany(company.id, values);
+        const dataToSend: Record<string, any> = { ...values };
+        
+        // Handle logo upload if it's a File object
+        if (values.logo instanceof File) {
+          try {
+            const mediaResponse = await uploadMedia(values.logo);
+            dataToSend.logo_id = mediaResponse.id;
+            delete dataToSend.logo; // Remove the File object
+          } catch (uploadError) {
+            console.error('Error uploading logo:', uploadError);
+            toast.error('Có lỗi xảy ra khi tải lên logo');
+            setIsSubmitting(false);
+            return;
+          }
+        } else if (typeof values.logo === 'string' && values.logo && values.logo !== company?.logo?.url) {
+          // Handle logo URL if it's different from current logo
+          try {
+            const mediaResponse = await createMediaFromUrl(values.logo);
+            dataToSend.logo_id = mediaResponse.id;
+            delete dataToSend.logo; // Remove the URL string
+          } catch (urlError) {
+            console.error('Error creating media from URL:', urlError);
+            toast.error('Có lỗi xảy ra khi tạo media từ URL');
+            setIsSubmitting(false);
+            return;
+          }
+        } else {
+          // Remove logo field if it's not being updated
+          delete dataToSend.logo;
+        }
+        
+        const resp = await updateCompany(company.id, dataToSend);
 
         if (resp) {
-          // Update company in context
           setCompany(resp);
           toast.success('Cập nhật thông tin công ty thành công');
         }
       }      
     } catch (error) {
       console.error('Error updating profile:', error);
+      toast.error('Có lỗi xảy ra khi cập nhật thông tin công ty');
     } finally {
       setIsSubmitting(false);
       setIsCompanyFormOpen(false);
     }
-  }, [company]);
+  }, [company, setCompany]);
   
   const handleCreateJob = useCallback(async (values: Record<string, any>) => {
     if (!company?.id) {
@@ -478,89 +511,101 @@ const RecruiterDashboard: React.FC = () => {
 
   // If company is linked, show the full dashboard
   return (
-    <div className="bg-white rounded-lg shadow px-4 py-5 sm:p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Bảng điều khiển</h1>
-      </div>
-      
-      {/* Main cards section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl shadow-sm p-6 hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
-          <div className="flex items-center mb-4">
-            <div className="bg-blue-500 p-3 rounded-lg mr-4">
-              <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-            <h2 className="text-lg font-semibold text-gray-900">Quản lý thông tin công ty</h2>
-          </div>
-          <p className="text-gray-700 mb-4">Cập nhật thông tin, logo và các chi tiết khác về công ty của bạn.</p>
-          <button onClick={() => setIsCompanyFormOpen(true)} className="text-blue-600 hover:text-blue-800 font-medium flex items-center cursor-pointer">
-            Quản lý thông tin <span className="ml-1">→</span>
-          </button>
+    <div className="space-y-8 max-w-[1400px]">
+      {/* Header */}
+      <div className="flex items-end justify-between border-b border-gray-200 pb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Bảng Điều Khiển Nhà Tuyển Dụng</h1>
+          <p className="text-sm text-gray-500 mt-2">
+            {company?.name || 'Bảng điều khiển công ty'}
+          </p>
         </div>
+      </div>
 
-        {companyFormComponent}
-        
-        <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl shadow-sm p-6 hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
-          <div className="flex items-center mb-4">
-            <div className="bg-green-500 p-3 rounded-lg mr-4">
-              <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+      {/* Quick Actions */}
+      <div>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Thao Tác Nhanh</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button
+            onClick={() => setIsCompanyFormOpen(true)}
+            className="bg-white border border-gray-100 p-6 hover:border-gray-200 transition-all text-left group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
+              <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">→</span>
             </div>
-            <h2 className="text-lg font-semibold text-gray-900">Đăng tin tuyển dụng</h2>
-          </div>
-          <p className="text-gray-700 mb-4">Tạo và quản lý các vị trí tuyển dụng của công ty bạn.</p>
-          <button onClick={() => setIsJobFormOpen(true)} className="text-green-600 hover:text-green-800 font-medium flex items-center cursor-pointer">
-            Đăng tin mới <span className="ml-1">→</span>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Thông tin công ty</h3>
+            <p className="text-xs text-gray-500">Cập nhật thông tin và cài đặt công ty</p>
           </button>
-        </div>
-        
-        {jobFormComponent}
-        
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl shadow-sm p-6 hover:shadow-md transition-all duration-300 transform hover:-translate-y-1">
-          <div className="flex items-center mb-4">
-            <div className="bg-purple-500 p-3 rounded-lg mr-4">
-              <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+
+          {companyFormComponent}
+          
+          <button
+            onClick={() => setIsJobFormOpen(true)}
+            className="bg-white border border-gray-100 p-6 hover:border-gray-200 transition-all text-left group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
+              <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">→</span>
             </div>
-            <h2 className="text-lg font-semibold text-gray-900">Tìm kiếm CV</h2>
-          </div>
-          <p className="text-gray-700 mb-4">Tìm kiếm và xem hồ sơ ứng viên phù hợp với yêu cầu của bạn.</p>
-          <button className="text-purple-600 hover:text-purple-800 font-medium flex items-center cursor-pointer">
-            Tìm kiếm CV <span className="ml-1">→</span>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Đăng tin tuyển dụng</h3>
+            <p className="text-xs text-gray-500">Tạo tin tuyển dụng mới</p>
+          </button>
+          
+          {jobFormComponent}
+          
+          <button
+            onClick={() => navigate('/nha-tuyen-dung/tim-kiem-ung-vien')}
+            className="bg-white border border-gray-100 p-6 hover:border-gray-200 transition-all text-left group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">→</span>
+            </div>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Tìm kiếm CV</h3>
+            <p className="text-xs text-gray-500">Tìm kiếm hồ sơ ứng viên</p>
           </button>
         </div>
       </div>
-      
-      {/* CV Suggestions section */}
-      <div className="border-t border-gray-200 pt-8">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">CV đề xuất</h2>
-          <button className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center cursor-pointer">
-            Xem tất cả <span className="ml-1">→</span>
-          </button>
-        </div>
-        <div className="flex bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
-          <div className="flex-shrink-0 mr-6">
-            {/* Placeholder for image */}
-            <div className="bg-white border-2 border-dashed rounded-xl w-16 h-16 flex items-center justify-center">
-              <svg className="h-8 w-8 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+
+      {/* Company Overview */}
+      <div>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Tổng Quan Công Ty</h2>
+        <div className="bg-white border border-gray-100 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Tên công ty</p>
+              <p className="text-sm font-semibold text-gray-900">{company?.name || 'Chưa có'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Địa điểm</p>
+              <p className="text-sm font-semibold text-gray-900">{company?.location || 'Chưa có'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Số nhân viên</p>
+              <p className="text-sm font-semibold text-gray-900">{company?.employees || 'Chưa có'}</p>
             </div>
           </div>
-          <div className="flex-1">
-            <p className="text-gray-700 mb-4">
-              Hệ thống đã tìm thấy các hồ sơ phù hợp với vị trí tuyển dụng của bạn. 
-              Xem ngay để tìm ứng viên tiềm năng cho công ty của bạn.
-            </p>
-            <button className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 cursor-pointer">
-              Xem tất cả CV đề xuất
-            </button>
-          </div>
+        </div>
+      </div>
+
+      {/* Suggested Candidates */}
+      <div>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Ứng Viên Đề Xuất</h2>
+        <div className="bg-white border border-gray-100 p-8 text-center">
+          <svg className="h-12 w-12 text-gray-300 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p className="text-sm text-gray-500 mb-4">Chưa có ứng viên đề xuất</p>
+          <button className="text-sm text-gray-900 border border-gray-200 px-4 py-2 hover:bg-gray-50 transition-colors">
+            Xem tất cả CV
+          </button>
         </div>
       </div>
     </div>

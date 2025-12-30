@@ -117,21 +117,15 @@ const applyForJob = async (req, res) => {
       status: 'pending'
     });
 
-    // Send notification to recruiter
+    // Send notification to recruiter (WebSocket is automatically sent by Notification.create)
     if (job.created_by) {
-      const notification = await Notification.create({
+      await Notification.create({
         user_id: job.created_by,
         title: 'Ứng viên mới ứng tuyển',
         message: `${req.user.name} đã ứng tuyển vào công việc "${job.title}"`,
         type: 'application',
-        link: `/nha-tuyen-dung/quan-ly-cong-viec`
+        link: `/nha-tuyen-dung/quan-ly-tin-tuyen-dung`
       });
-
-      // Send WebSocket notification
-      const notificationWS = req.app.get('notificationWS');
-      if (notificationWS) {
-        notificationWS.sendToUser(job.created_by, notification);
-      }
       
       // Send email to recruiter (check email_notifications_enabled first)
       const [recruiterPrefs] = await db.query(
@@ -184,20 +178,15 @@ const applyForJob = async (req, res) => {
           notificationType = 'info';
         }
         
-        // Send notification to recruiter
+        // Send notification to recruiter (WebSocket is automatically sent by Notification.create)
         if (job.created_by) {
-          const thresholdNotification = await Notification.create({
+          await Notification.create({
             user_id: job.created_by,
             title: notificationTitle,
             message: notificationMessage,
             type: notificationType,
-            link: `/nha-tuyen-dung/quan-ly-cong-viec`
+            link: `/nha-tuyen-dung/quan-ly-tin-tuyen-dung`
           });
-          
-          const notificationWS = req.app.get('notificationWS');
-          if (notificationWS) {
-            notificationWS.sendToUser(job.created_by, thresholdNotification);
-          }
         }
         
         // Send email notification to recruiter (check email_notifications_enabled first)
@@ -443,7 +432,28 @@ const withdrawApplication = async (req, res) => {
       });
     }
 
+    // Get job details for notification
+    const [jobRows] = await db.query(
+      `SELECT j.title, j.created_by
+       FROM jobs j
+       WHERE j.id = ?`,
+      [application.job_id]
+    );
+    
+    const job = jobRows[0];
+
     await JobApplication.delete(id);
+
+    // Notify HR/recruiter about withdrawal (WebSocket is automatically sent by Notification.create)
+    if (job && job.created_by) {
+      await Notification.create({
+        user_id: job.created_by,
+        title: 'Ứng viên đã rút đơn ứng tuyển',
+        message: `${req.user.name} đã rút đơn ứng tuyển cho công việc "${job.title}"`,
+        type: 'info',
+        link: `/nha-tuyen-dung/quan-ly-tin-tuyen-dung/${application.job_id}/ung-vien`
+      });
+    }
 
     res.json({
       result: true,

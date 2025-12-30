@@ -14,10 +14,17 @@ import {
   LuX,
   LuPlus,
   LuEye,
-  LuPencil
+  LuPencil,
+  LuPalette,
+  LuImage,
+  LuSearch,
+  LuFilter,
+  LuRefreshCw
 } from 'react-icons/lu';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import TemplateSelectionModal from '../../components/cv/TemplateSelectionModal';
+import CVPreviewModal from '../../components/cv/CVPreviewModal';
+import SelectWithSearch from '../../components/common/SelectWithSearch';
 
 const CVManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -32,6 +39,7 @@ const CVManagement: React.FC = () => {
     totalPages: 0
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [uploadData, setUploadData] = useState({
     title: '',
@@ -51,6 +59,8 @@ const CVManagement: React.FC = () => {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [editingCvId, setEditingCvId] = useState<number | null>(null);
+  const [showCVPreviewModal, setShowCVPreviewModal] = useState(false);
+  const [previewCvId, setPreviewCvId] = useState<number | null>(null);
 
   const fetchCVs = useCallback(async (page: number = 1, search: string = '') => {
     try {
@@ -151,8 +161,8 @@ const CVManagement: React.FC = () => {
 
   const handlePreview = (cv: CV) => {
     if (cv.template_id) {
-      // Open preview page for template-based CVs
-      window.open(`/cv/preview/${cv.id}`, '_blank');
+      setPreviewCvId(cv.id);
+      setShowCVPreviewModal(true);
     } else {
       toast.info('Preview chỉ khả dụng cho CV từ template');
     }
@@ -271,6 +281,32 @@ const CVManagement: React.FC = () => {
     setShowTemplateModal(true);
   };
 
+  // Filter CVs based on search and type
+  const filteredCVs = React.useMemo(() => {
+    let filtered = cvs;
+    
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(cv =>
+        cv.title?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Filter by type
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(cv => {
+        if (typeFilter === 'template') {
+          return cv.template_id !== null && cv.template_id !== undefined;
+        } else if (typeFilter === 'upload') {
+          return !cv.template_id;
+        }
+        return true;
+      });
+    }
+    
+    return filtered;
+  }, [cvs, searchTerm, typeFilter]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -281,11 +317,18 @@ const CVManagement: React.FC = () => {
         </div>
         <div className="flex gap-3">
           <button
+            onClick={() => fetchCVs(currentPage, searchTerm)}
+            className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+            title="Tải lại"
+          >
+            <LuRefreshCw className="w-5 h-5" />
+          </button>
+          <button
             onClick={() => setShowTemplateModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer"
           >
-            <LuPlus className="w-5 h-5" />
-            Tạo CV mới
+            <LuPalette className="w-5 h-5" />
+            Tạo CV từ template
           </button>
           <button
             onClick={() => setIsUploadModalOpen(true)}
@@ -297,21 +340,80 @@ const CVManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Search */}
+      {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm p-4">
-        <input
-          type="text"
-          placeholder="Tìm kiếm CV theo tiêu đề..."
-          value={searchTerm}
-          onChange={handleSearch}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
+        <div className="flex items-center gap-2 mb-4">
+          <LuFilter className="w-5 h-5 text-gray-600" />
+          <h2 className="text-lg font-semibold text-gray-900">Bộ lọc</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Search */}
+          <div className="relative">
+            <LuSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm CV theo tiêu đề..."
+              value={searchTerm}
+              onChange={handleSearch}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Type Filter */}
+          <div>
+            <SelectWithSearch
+              options={[
+                { value: 'all', label: 'Tất cả loại CV' },
+                { value: 'template', label: 'CV từ Template' },
+                { value: 'upload', label: 'CV đã tải lên' }
+              ]}
+              selectedValues={[typeFilter]}
+              onChange={(values) => setTypeFilter(values[0] || 'all')}
+              placeholder="Chọn loại CV"
+              multiple={false}
+              clearable={false}
+            />
+          </div>
+        </div>
+
+        {/* Filter Summary */}
+        {(searchTerm || typeFilter !== 'all') && (
+          <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+            <span>Hiển thị {filteredCVs.length} / {cvs.length} CV</span>
+            {(searchTerm || typeFilter !== 'all') && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setTypeFilter('all');
+                }}
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Xóa bộ lọc
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* CV List */}
       {loading ? (
         <div className="flex justify-center items-center py-12">
           <LuLoader className="w-8 h-8 animate-spin text-blue-600" />
+        </div>
+      ) : filteredCVs.length === 0 && cvs.length > 0 ? (
+        <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+          <LuFileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Không tìm thấy CV phù hợp</h3>
+          <p className="text-gray-600 mb-6">Thử thay đổi bộ lọc để tìm kiếm CV khác</p>
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setTypeFilter('all');
+            }}
+            className="text-blue-600 hover:text-blue-700 font-medium"
+          >
+            Xóa bộ lọc
+          </button>
         </div>
       ) : cvs.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center">
@@ -328,13 +430,27 @@ const CVManagement: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {cvs.map((cv) => (
+          {filteredCVs.map((cv) => (
             <div
               key={cv.id}
               className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-200 flex flex-col"
             >
-              {/* CV Preview/Thumbnail */}
-              <div className="w-full h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
+              {/* CV Preview */}
+              <div className="relative bg-gray-50 h-64 flex items-center justify-center overflow-hidden rounded-t-xl border-b">
+                {/* Type Badge Overlay */}
+                <div className="absolute top-3 left-3 z-1">
+                  {cv.template_id ? (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg shadow-lg">
+                      <LuPalette className="w-4 h-4" />
+                      CV Template
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg shadow-lg">
+                      <LuImage className="w-4 h-4" />
+                      CV Đã tải lên
+                    </div>
+                  )}
+                </div>
                 {cv.file_url ? (
                   (() => {
                     const fileInfo = getFileTypeInfo(cv.file_name, cv.mime_type);
@@ -344,7 +460,7 @@ const CVManagement: React.FC = () => {
                       return (
                         <div 
                           className="w-full h-full cursor-pointer relative group"
-                          onClick={() => handleViewImage(cv)}
+                          onClick={() => cv.template_id ? handlePreview(cv) : handleViewImage(cv)}
                         >
                           <img
                             src={cv.file_url}
@@ -388,7 +504,20 @@ const CVManagement: React.FC = () => {
               {/* CV Info */}
               <div className="p-6 flex flex-col flex-1">
                 <div className="mb-4">
-                  <h3 className="font-semibold text-gray-900 truncate mb-2">{cv.title}</h3>
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-gray-900 truncate flex-1">{cv.title}</h3>
+                    {cv.template_id ? (
+                      <span className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 text-xs font-semibold rounded-full border border-purple-200 ml-2 whitespace-nowrap">
+                        <LuPalette className="w-3.5 h-3.5" />
+                        Template
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 text-xs font-semibold rounded-full border border-blue-200 ml-2 whitespace-nowrap">
+                        <LuImage className="w-3.5 h-3.5" />
+                        Tải lên
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full bg-${getFileTypeInfo(cv.file_name, cv.mime_type).color}-100 text-${getFileTypeInfo(cv.file_name, cv.mime_type).color}-700`}>
                       {getFileTypeInfo(cv.file_name, cv.mime_type).label}
@@ -411,28 +540,17 @@ const CVManagement: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col gap-2 mt-auto">
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handleDownload(cv)}
-                      className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer font-medium text-sm"
-                    >
-                      <LuDownload className="w-4 h-4" />
-                      Tải xuống
-                    </button>
-                    {cv.template_id && (
-                      <button
-                        onClick={() => handlePreview(cv)}
-                        className="flex items-center justify-center gap-2 px-3 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors cursor-pointer font-medium text-sm"
-                      >
-                        <LuEye className="w-4 h-4" />
-                        Xem trước
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    onClick={() => handleDownload(cv)}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer font-medium text-sm"
+                  >
+                    <LuDownload className="w-4 h-4" />
+                    Tải xuống
+                  </button>
                   {cv.template_id && (
                     <button
                       onClick={() => handleEditCV(cv.id)}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer font-medium"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer font-medium text-sm"
                     >
                       <LuPencil className="w-4 h-4" />
                       Chỉnh sửa
@@ -440,7 +558,7 @@ const CVManagement: React.FC = () => {
                   )}
                   <button
                     onClick={() => handleDeleteClick(cv.id)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer font-medium"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer font-medium text-sm"
                   >
                     <LuTrash2 className="w-4 h-4" />
                     Xóa CV
@@ -661,6 +779,18 @@ const CVManagement: React.FC = () => {
         }}
         editingCvId={editingCvId}
       />
+
+      {/* CV Preview Modal */}
+      {previewCvId && (
+        <CVPreviewModal
+          isOpen={showCVPreviewModal}
+          onClose={() => {
+            setShowCVPreviewModal(false);
+            setPreviewCvId(null);
+          }}
+          cvId={previewCvId}
+        />
+      )}
     </div>
   );
 };

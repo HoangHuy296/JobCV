@@ -8,7 +8,10 @@ interface JwtPayload {
   role: {
     name: string;
   };
-  image: string | null;
+  image: {
+    id: number;
+    url: string;
+  } | null;
   is_active: boolean;
   exp: number;
   iat: number;

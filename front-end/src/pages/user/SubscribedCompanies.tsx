@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { getUserSubscribedCompanies, unsubscribeFromCompany, type Company } from '../../api/companyService';
 import { toast } from 'react-toastify';
 import { formatDate } from '../../utils/dateUtils';
-import { LuBell, LuBellOff, LuBuilding2, LuMapPin, LuUsers, LuBriefcase, LuLoader, LuGlobe, LuRefreshCw } from 'react-icons/lu';
+import { LuBell, LuBellOff, LuBuilding2, LuMapPin, LuUsers, LuBriefcase, LuLoader, LuGlobe, LuRefreshCw, LuSearch, LuFilter } from 'react-icons/lu';
+import SelectWithSearch from '../../components/common/SelectWithSearch';
 
 interface CompanyWithStats extends Company {
   subscribed_at?: string;
@@ -21,6 +22,8 @@ const SubscribedCompanies: React.FC = () => {
     total: 0,
     totalPages: 0
   });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [locationFilter, setLocationFilter] = useState<string>('all');
 
   const fetchSubscribedCompanies = useCallback(async (page: number = 1) => {
     try {
@@ -56,6 +59,29 @@ const SubscribedCompanies: React.FC = () => {
     const encodedCompanyId = btoa(companyId.toString());
     navigate(`/cong-ty/${encodedCompanyId}`);
   };
+
+  // Filter companies based on search and location
+  const filteredCompanies = React.useMemo(() => {
+    return companies.filter(company => {
+      const matchesSearch = searchTerm === '' ||
+        company.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        company.location?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesLocation = locationFilter === 'all' || 
+        company.location?.toLowerCase().includes(locationFilter.toLowerCase());
+      
+      return matchesSearch && matchesLocation;
+    });
+  }, [companies, searchTerm, locationFilter]);
+
+  // Get unique locations for filter
+  const uniqueLocations = React.useMemo(() => {
+    const locations = companies
+      .map(c => c.location)
+      .filter((loc): loc is string => !!loc)
+      .map(loc => loc.split(',')[0].trim());
+    return Array.from(new Set(locations)).sort();
+  }, [companies]);
 
 
   if (loading) {
@@ -101,7 +127,76 @@ const SubscribedCompanies: React.FC = () => {
         </div>
       </div>
 
-      {companies.length === 0 ? (
+      {/* Filters */}
+      {companies.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <LuFilter className="w-5 h-5 text-gray-600" />
+            <h2 className="text-lg font-semibold text-gray-900">Bộ lọc</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Search */}
+            <div className="relative">
+              <LuSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm kiếm theo tên công ty, địa điểm..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Location Filter */}
+            <div>
+              <SelectWithSearch
+                options={[
+                  { value: 'all', label: 'Tất cả địa điểm' },
+                  ...uniqueLocations.map(location => ({
+                    value: location,
+                    label: location
+                  }))
+                ]}
+                selectedValues={[locationFilter]}
+                onChange={(values) => setLocationFilter(values[0] || 'all')}
+                placeholder="Chọn địa điểm"
+                multiple={false}
+                clearable={false}
+              />
+            </div>
+          </div>
+
+          {/* Filter Summary */}
+          {(searchTerm || locationFilter !== 'all') && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+              <span>Hiển thị {filteredCompanies.length} / {companies.length} công ty</span>
+              {(searchTerm || locationFilter !== 'all') && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setLocationFilter('all');
+                  }}
+                  className="text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Xóa bộ lọc
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {filteredCompanies.length === 0 && companies.length > 0 ? (
+        <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+          <LuBellOff className="mx-auto h-16 w-16 text-gray-400" />
+          <h3 className="mt-4 text-lg font-medium text-gray-900">
+            Không tìm thấy công ty phù hợp
+          </h3>
+          <p className="mt-2 text-sm text-gray-500">
+            Thử thay đổi bộ lọc để tìm kiếm công ty khác
+          </p>
+        </div>
+      ) : companies.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center">
           <LuBellOff className="mx-auto h-16 w-16 text-gray-400" />
           <h3 className="mt-4 text-lg font-medium text-gray-900">
@@ -120,7 +215,7 @@ const SubscribedCompanies: React.FC = () => {
       ) : (
         <>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {companies.map((company) => (
+            {filteredCompanies.map((company) => (
               <div
                 key={company.id}
                 className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden border border-gray-200"

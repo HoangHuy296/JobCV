@@ -34,6 +34,12 @@ export const createCVFromTemplate = async (cvData: {
   template_id: number;
   title: string;
   data: any; // Changed from template_data to data
+  sections?: Array<{
+    section_id: number;
+    position: any;
+    is_visible: boolean;
+    display_order: number;
+  }>;
 }) => {
   const response = await apiClient.post('/cv-templates/create-cv', cvData);
   return response.data;

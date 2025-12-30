@@ -371,9 +371,10 @@ const JobReviewManagement: React.FC = () => {
                     </div>
 
                     {/* Description */}
-                    <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-                      {job.brief_description}
-                    </p>
+                    <div 
+                      className="text-sm text-gray-600 line-clamp-2 mb-3"
+                      dangerouslySetInnerHTML={{ __html: job.brief_description }}
+                    />
 
                     {/* Meta Info */}
                     <div className="flex items-center gap-4 text-xs text-gray-500">

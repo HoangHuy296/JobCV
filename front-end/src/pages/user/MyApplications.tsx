@@ -12,9 +12,14 @@ import {
   LuFileText,
   LuTrash2,
   LuLoader,
-  LuInfo
+  LuInfo,
+  LuSearch,
+  LuFilter,
+  LuRefreshCw
 } from 'react-icons/lu';
 import { usePagination } from '../../hooks/usePagination';
+import SelectWithSearch from '../../components/common/SelectWithSearch';
+import ConfirmModal from '../../components/common/ConfirmModal';
 
 // Memoized status config to avoid recreation on every render
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
@@ -41,6 +46,10 @@ const MyApplications: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const { currentPage, setCurrentPage, pagination, setPagination } = usePagination(10);
   const [withdrawingId, setWithdrawingId] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+  const [applicationToWithdraw, setApplicationToWithdraw] = useState<number | null>(null);
 
   const fetchApplications = useCallback(async () => {
     try {
@@ -65,26 +74,45 @@ const MyApplications: React.FC = () => {
     fetchApplications();
   }, [fetchApplications]);
 
-  const handleWithdraw = useCallback(async (id: number) => {
-    if (!confirm('Bạn có chắc muốn rút đơn ứng tuyển này?')) {
-      return;
-    }
+  const handleWithdraw = useCallback((id: number) => {
+    setApplicationToWithdraw(id);
+    setWithdrawModalOpen(true);
+  }, []);
+
+  const confirmWithdraw = useCallback(async () => {
+    if (!applicationToWithdraw) return;
 
     try {
-      setWithdrawingId(id);
-      await withdrawApplication(id);
+      setWithdrawingId(applicationToWithdraw);
+      await withdrawApplication(applicationToWithdraw);
       toast.success('Rút đơn ứng tuyển thành công');
       fetchApplications();
     } catch (error) {
       console.error('Error withdrawing application:', error);
     } finally {
       setWithdrawingId(null);
+      setWithdrawModalOpen(false);
+      setApplicationToWithdraw(null);
     }
-  }, [fetchApplications]);
+  }, [applicationToWithdraw, fetchApplications]);
 
   const canWithdraw = useCallback((status: string) => {
     return ['pending', 'reviewing'].includes(status);
   }, []);
+
+  // Filter applications based on search and status
+  const filteredApplications = React.useMemo(() => {
+    return applications.filter(app => {
+      const matchesSearch = searchTerm === '' ||
+        app.job_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        app.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        app.job_location?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || app.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [applications, searchTerm, statusFilter]);
 
   if (loading) {
     return (
@@ -100,20 +128,89 @@ const MyApplications: React.FC = () => {
   return (
     <>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Đơn ứng tuyển của tôi</h1>
-        <p className="text-gray-600 mt-2">Quản lý và theo dõi các đơn ứng tuyển của bạn</p>
+      <div className="mb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Đơn ứng tuyển của tôi</h1>
+          <p className="text-gray-600 mt-2">Quản lý và theo dõi các đơn ứng tuyển của bạn</p>
+        </div>
+        <button
+          onClick={() => fetchApplications()}
+          className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+          title="Tải lại"
+        >
+          <LuRefreshCw className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <LuFilter className="w-5 h-5 text-gray-600" />
+          <h2 className="text-lg font-semibold text-gray-900">Bộ lọc</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Search */}
+          <div className="relative">
+            <LuSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Tìm kiếm theo tên công việc, công ty, địa điểm..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Status Filter */}
+          <div>
+            <SelectWithSearch
+              options={[
+                { value: 'all', label: 'Tất cả trạng thái' },
+                { value: 'pending', label: 'Chờ xử lý' },
+                { value: 'reviewing', label: 'Đang xem xét' },
+                { value: 'shortlisted', label: 'Đạt vòng sơ tuyển' },
+                { value: 'accepted', label: 'Chấp nhận' },
+                { value: 'rejected', label: 'Từ chối' }
+              ]}
+              selectedValues={[statusFilter]}
+              onChange={(values) => setStatusFilter(values[0] || 'all')}
+              placeholder="Chọn trạng thái"
+              multiple={false}
+              clearable={false}
+            />
+          </div>
+        </div>
+
+        {/* Filter Summary */}
+        {(searchTerm || statusFilter !== 'all') && (
+          <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+            <span>Hiển thị {filteredApplications.length} / {applications.length} đơn ứng tuyển</span>
+            {(searchTerm || statusFilter !== 'all') && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                }}
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Xóa bộ lọc
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Applications List */}
-      {applications.length === 0 ? (
+      {filteredApplications.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-lg shadow">
           <LuBriefcase className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">
             Chưa có đơn ứng tuyển nào
           </h3>
           <p className="text-gray-600 mb-6">
-            Bắt đầu tìm kiếm và ứng tuyển công việc phù hợp với bạn
+            {applications.length === 0
+              ? 'Bắt đầu tìm kiếm và ứng tuyển công việc phù hợp với bạn'
+              : 'Không tìm thấy đơn ứng tuyển phù hợp với bộ lọc'}
           </p>
           <a
             href="/viec-lam"
@@ -125,7 +222,7 @@ const MyApplications: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {applications.map((app) => (
+          {filteredApplications.map((app) => (
             <div
               key={app.id}
               className="bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6"
@@ -258,6 +355,22 @@ const MyApplications: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Withdraw Confirmation Modal */}
+      <ConfirmModal
+        isOpen={withdrawModalOpen}
+        onClose={() => {
+          setWithdrawModalOpen(false);
+          setApplicationToWithdraw(null);
+        }}
+        onConfirm={confirmWithdraw}
+        title="Xác nhận rút đơn"
+        message="Bạn có chắc muốn rút đơn ứng tuyển này? Hành động này không thể hoàn tác."
+        confirmText="Rút đơn"
+        cancelText="Hủy"
+        type="warning"
+        isLoading={withdrawingId === applicationToWithdraw}
+      />
     </>
   );
 };

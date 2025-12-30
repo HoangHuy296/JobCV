@@ -90,23 +90,45 @@ const JobListing: React.FC = () => {
         
         // Filter by salary range if selected
         if (selectedSalary !== 'all') {
-          // This is a simplified example - in a real app, you'd need to parse the salary string
-          // and apply proper filtering logic based on your salary data format
           filteredJobs = filteredJobs.filter(job => {
-            if (selectedSalary === 'negotiable' && job.salary.toLowerCase().includes('thỏa thuận')) {
-              return true;
-            } else if (selectedSalary === 'under_10' && job.salary.includes('< 10')) {
-              return true;
-            } else if (selectedSalary === '10_15' && job.salary.includes('10-15')) {
-              return true;
-            } else if (selectedSalary === '15_20' && job.salary.includes('15-20')) {
-              return true;
-            } else if (selectedSalary === '20_30' && job.salary.includes('20-30')) {
-              return true;
-            } else if (selectedSalary === 'above_30' && job.salary.includes('> 30')) {
-              return true;
+            const salaryStr = job.salary?.toLowerCase() || '';
+            
+            // Check for negotiable salary
+            if (selectedSalary === 'negotiable') {
+              return salaryStr.includes('thỏa thuận') || salaryStr.includes('thoả thuận') || salaryStr.includes('deal') || salaryStr.includes('协商');
             }
-            return false;
+            
+            // Extract numbers from salary string (e.g., "10-15 triệu", "Từ 20 triệu", "Trên 30 triệu")
+            const numbers = salaryStr.match(/\d+/g);
+            if (!numbers || numbers.length === 0) {
+              return false; // No numbers found, exclude from filter
+            }
+            
+            // Parse salary range
+            const salaryNumbers = numbers.map(n => parseInt(n));
+            let minSalary = Math.min(...salaryNumbers);
+            let maxSalary = Math.max(...salaryNumbers);
+            
+            // If only one number, use it as both min and max
+            if (salaryNumbers.length === 1) {
+              minSalary = maxSalary = salaryNumbers[0];
+            }
+            
+            // Apply filter based on selected range
+            switch (selectedSalary) {
+              case 'under_10':
+                return maxSalary < 10;
+              case '10_15':
+                return (minSalary >= 10 && minSalary < 15) || (maxSalary >= 10 && maxSalary <= 15) || (minSalary < 10 && maxSalary > 15);
+              case '15_20':
+                return (minSalary >= 15 && minSalary < 20) || (maxSalary >= 15 && maxSalary <= 20) || (minSalary < 15 && maxSalary > 20);
+              case '20_30':
+                return (minSalary >= 20 && minSalary < 30) || (maxSalary >= 20 && maxSalary <= 30) || (minSalary < 20 && maxSalary > 30);
+              case 'above_30':
+                return minSalary >= 30;
+              default:
+                return true;
+            }
           });
         }
         
@@ -497,9 +519,9 @@ const JobListing: React.FC = () => {
               {jobs.map((job) => (
                 <div 
                   key={job.id} 
-                  className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:border-blue-300 group transform hover:-translate-y-1"
+                  className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:border-blue-300 group transform hover:-translate-y-1 flex flex-col"
                 >
-                  <div className="p-6">
+                  <div className="p-6 flex flex-col flex-1">
                     {/* Header: Logo + Title + Company */}
                     <div className="flex items-start">
                       <div className="flex-shrink-0 h-16 w-16 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center border-2 border-white shadow-md">
@@ -557,7 +579,7 @@ const JobListing: React.FC = () => {
                     </div>
                     
                     {/* See Detail Button with Border */}
-                    <div className="mt-6 pt-4 border-t border-gray-100 flex justify-end">
+                    <div className="mt-auto pt-4 border-t border-gray-100 flex justify-end">
                       <button 
                         onClick={() => handleViewDetail(job)}
                         className="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm font-semibold cursor-pointer group-hover:translate-x-1 transition-all duration-200 px-3 py-1 rounded-lg hover:bg-blue-50"

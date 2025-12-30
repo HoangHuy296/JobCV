@@ -5,7 +5,7 @@ export interface Notification {
   user_id: number;
   title: string;
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error' | 'job' | 'campaign' | 'review' | 'system';
+  type: 'info' | 'success' | 'warning' | 'error' | 'job' | 'campaign' | 'review' | 'system' | 'application';
   link: string | null;
   is_read: boolean;
   created_at: string;

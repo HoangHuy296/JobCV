@@ -7,11 +7,10 @@ import {
   LuBriefcase,
   LuBuilding2,
   LuFileText,
-  LuMegaphone,
-  LuBell,
   LuTrendingUp,
-  LuClock,
-  LuLoader
+  LuArrowUpRight,
+  LuArrowDownRight,
+  LuRefreshCw
 } from 'react-icons/lu';
 
 const AdminDashboard: React.FC = () => {
@@ -39,9 +38,10 @@ const AdminDashboard: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <LuLoader className="w-12 h-12 text-blue-600 animate-spin mx-auto" />
-          <p className="mt-4 text-gray-600">Đang tải thống kê...</p>
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" />
+          <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+          <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
         </div>
       </div>
     );
@@ -50,10 +50,10 @@ const AdminDashboard: React.FC = () => {
   if (!stats) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">Không thể tải thống kê</p>
+        <p className="text-gray-500 text-sm">Không thể tải dữ liệu</p>
         <button
           onClick={fetchStats}
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer"
+          className="mt-3 px-4 py-2 text-sm bg-gray-900 text-white rounded hover:bg-gray-800 cursor-pointer"
         >
           Thử lại
         </button>
@@ -61,327 +61,286 @@ const AdminDashboard: React.FC = () => {
     );
   }
 
-  const StatCard = ({ 
+  const MetricCard = ({ 
     title, 
     value, 
     change, 
     icon: Icon, 
-    color, 
     onClick 
   }: { 
     title: string; 
     value: number; 
     change?: number; 
     icon: any; 
-    color: string; 
     onClick?: () => void;
-  }) => (
-    <div 
-      className={`bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow ${
-        onClick ? 'cursor-pointer' : ''
-      }`}
-      onClick={onClick}
-    >
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-2">{value.toLocaleString()}</p>
-          {change !== undefined && change > 0 && (
-            <div className="flex items-center mt-2 text-sm text-green-600">
-              <LuTrendingUp className="w-4 h-4 mr-1" />
-              <span>+{change} hôm nay</span>
+  }) => {
+    const isPositive = change !== undefined && change > 0;
+    const hasChange = change !== undefined && change !== 0;
+    
+    return (
+      <div 
+        className={`bg-white border border-gray-100 p-6 hover:border-gray-200 transition-all ${
+          onClick ? 'cursor-pointer' : ''
+        }`}
+        onClick={onClick}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <Icon className="w-5 h-5 text-gray-400" />
+          {hasChange && (
+            <div className={`flex items-center gap-1 text-xs font-medium ${
+              isPositive ? 'text-emerald-600' : 'text-red-600'
+            }`}>
+              {isPositive ? <LuArrowUpRight className="w-3 h-3" /> : <LuArrowDownRight className="w-3 h-3" />}
+              <span>{Math.abs(change!)}</span>
             </div>
           )}
         </div>
-        <div className={`p-4 rounded-full ${color}`}>
-          <Icon className="w-8 h-8 text-white" />
+        <div>
+          <p className="text-3xl font-bold text-gray-900 tracking-tight">{value.toLocaleString()}</p>
+          <p className="text-xs text-gray-500 mt-1 uppercase tracking-wider">{title}</p>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-[1400px]">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between border-b border-gray-200 pb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Tổng quan hệ thống</h1>
-          <p className="text-gray-600 mt-1">Thống kê và phân tích hoạt động</p>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Báo Cáo Hệ Thống</h1>
+          <p className="text-sm text-gray-500 mt-2">
+            {new Date().toLocaleDateString('vi-VN', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}
+          </p>
         </div>
         <button
           onClick={fetchStats}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
         >
-          
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
+          <LuRefreshCw className="w-4 h-4" />
           Làm mới
         </button>
       </div>
 
-      {/* Overview Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-        <StatCard
-          title="Người dùng"
-          value={stats.overview.users.total_users}
-          change={stats.overview.users.new_users_today}
-          icon={LuUsers}
-          color="bg-blue-600"
-          onClick={() => navigate('/admin/quan-ly-nguoi-dung')}
-        />
-        <StatCard
-          title="Công việc"
-          value={stats.overview.jobs.total_jobs}
-          change={stats.overview.jobs.new_jobs_today}
-          icon={LuBriefcase}
-          color="bg-green-600"
-          onClick={() => navigate('/admin/quan-ly-cong-viec')}
-        />
-        <StatCard
-          title="Công ty"
-          value={stats.overview.companies.total_companies}
-          change={stats.overview.companies.new_companies_today}
-          icon={LuBuilding2}
-          color="bg-purple-600"
-          onClick={() => navigate('/admin/quan-ly-cong-ty')}
-        />
-        <StatCard
-          title="CV"
-          value={stats.overview.cvs.total_cvs}
-          change={stats.overview.cvs.new_cvs_today}
-          icon={LuFileText}
-          color="bg-orange-600"
-          onClick={() => navigate('/admin/quan-ly-cv')}
-        />
-        <StatCard
-          title="Chiến dịch"
-          value={stats.overview.campaigns.total_campaigns}
-          icon={LuMegaphone}
-          color="bg-pink-600"
-        />
-        <StatCard
-          title="Thông báo"
-          value={stats.overview.notifications.total_notifications}
-          change={stats.overview.notifications.notifications_today}
-          icon={LuBell}
-          color="bg-indigo-600"
-          onClick={() => navigate('/admin/quan-ly-thong-bao')}
-        />
+      {/* Key Metrics */}
+      <div>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Chỉ Số Chính</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard
+            title="Người dùng"
+            value={stats.overview.users.total_users}
+            change={stats.overview.users.new_users_today}
+            icon={LuUsers}
+            onClick={() => navigate('/admin/quan-ly-nguoi-dung')}
+          />
+          <MetricCard
+            title="Công việc"
+            value={stats.overview.jobs.total_jobs}
+            change={stats.overview.jobs.new_jobs_today}
+            icon={LuBriefcase}
+            onClick={() => navigate('/admin/quan-ly-cong-viec')}
+          />
+          <MetricCard
+            title="Công ty"
+            value={stats.overview.companies.total_companies}
+            change={stats.overview.companies.new_companies_today}
+            icon={LuBuilding2}
+            onClick={() => navigate('/admin/quan-ly-cong-ty')}
+          />
+          <MetricCard
+            title="CVs"
+            value={stats.overview.cvs.total_cvs}
+            change={stats.overview.cvs.new_cvs_today}
+            icon={LuFileText}
+            onClick={() => navigate('/admin/quan-ly-cv')}
+          />
+        </div>
       </div>
 
-      {/* Detailed Stats Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* User Status */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Trạng thái người dùng</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Đang hoạt động</span>
-              <span className="font-semibold text-green-600">
-                {stats.overview.users.active_users}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Chưa kích hoạt</span>
-              <span className="font-semibold text-yellow-600">
-                {stats.overview.users.inactive_users}
-              </span>
-            </div>
-            <div className="pt-3 border-t">
+      {/* Status Breakdown */}
+      <div>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Tổng Quan Trạng Thái</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="bg-white border border-gray-100 p-6">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-4">Người dùng</p>
+            <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Tổng cộng</span>
-                <span className="font-bold text-gray-900">
-                  {stats.overview.users.total_users}
+                <span className="text-sm text-gray-600">Đang hoạt động</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {stats.overview.users.active_users}
                 </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Không hoạt động</span>
+                <span className="text-sm font-semibold text-gray-400">
+                  {stats.overview.users.inactive_users}
+                </span>
+              </div>
+              <div className="pt-3 border-t border-gray-100">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Tổng cộng</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {stats.overview.users.total_users}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Job Status */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Trạng thái công việc</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Đang tuyển</span>
-              <span className="font-semibold text-green-600">
-                {stats.overview.jobs.active_jobs}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Đã đóng</span>
-              <span className="font-semibold text-gray-600">
-                {stats.overview.jobs.inactive_jobs}
-              </span>
-            </div>
-            <div className="pt-3 border-t">
+          <div className="bg-white border border-gray-100 p-6">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-4">Công việc</p>
+            <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Tổng cộng</span>
-                <span className="font-bold text-gray-900">
-                  {stats.overview.jobs.total_jobs}
+                <span className="text-sm text-gray-600">Đang hoạt động</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {stats.overview.jobs.active_jobs}
                 </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Đã đóng</span>
+                <span className="text-sm font-semibold text-gray-400">
+                  {stats.overview.jobs.inactive_jobs}
+                </span>
+              </div>
+              <div className="pt-3 border-t border-gray-100">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Tổng cộng</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {stats.overview.jobs.total_jobs}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Company Status */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Trạng thái công ty</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Đang hoạt động</span>
-              <span className="font-semibold text-green-600">
-                {stats.overview.companies.active_companies}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Tổng công ty</span>
-              <span className="font-semibold text-gray-600">
-                {stats.overview.companies.total_companies}
-              </span>
-            </div>
-            <div className="pt-3 border-t">
+          <div className="bg-white border border-gray-100 p-6">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-4">Công ty</p>
+            <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Mới hôm nay</span>
-                <span className="font-bold text-blue-600">
+                <span className="text-sm text-gray-600">Đang hoạt động</span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {stats.overview.companies.active_companies}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Mới hôm nay</span>
+                <span className="text-sm font-semibold text-emerald-600">
                   +{stats.overview.companies.new_companies_today}
                 </span>
               </div>
+              <div className="pt-3 border-t border-gray-100">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Tổng cộng</span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {stats.overview.companies.total_companies}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* User Growth */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Tăng trưởng người dùng (7 ngày)</h3>
-          <div className="space-y-2">
-            {stats.charts.userGrowth.map((item, index) => (
-              <div key={index} className="flex items-center gap-3">
-                <span className="text-sm text-gray-600 w-24">
-                  {new Date(item.date).toLocaleDateString('vi-VN', { month: 'short', day: 'numeric' })}
-                </span>
-                <div className="flex-1 bg-gray-200 rounded-full h-6 relative overflow-hidden">
-                  <div 
-                    className="bg-blue-600 h-full rounded-full flex items-center justify-end pr-2"
-                    style={{ width: `${Math.max((item.count / Math.max(...stats.charts.userGrowth.map(i => i.count))) * 100, 5)}%` }}
-                  >
-                    <span className="text-xs text-white font-medium">{item.count}</span>
+      {/* Growth Trends */}
+      <div>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Xu Hướng 7 Ngày</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-white border border-gray-100 p-6">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-4">Tăng trưởng người dùng</p>
+            <div className="space-y-2">
+              {stats.charts.userGrowth.map((item, index) => (
+                <div key={index} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500 w-16 font-mono">
+                    {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                  <div className="flex-1 bg-gray-50 h-8 relative overflow-hidden">
+                    <div 
+                      className="bg-gray-900 h-full flex items-center justify-end pr-3 transition-all"
+                      style={{ width: `${Math.max((item.count / Math.max(...stats.charts.userGrowth.map(i => i.count))) * 100, 8)}%` }}
+                    >
+                      <span className="text-xs text-white font-medium">{item.count}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Job Growth */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Tăng trưởng công việc (7 ngày)</h3>
-          <div className="space-y-2">
-            {stats.charts.jobGrowth.map((item, index) => (
-              <div key={index} className="flex items-center gap-3">
-                <span className="text-sm text-gray-600 w-24">
-                  {new Date(item.date).toLocaleDateString('vi-VN', { month: 'short', day: 'numeric' })}
-                </span>
-                <div className="flex-1 bg-gray-200 rounded-full h-6 relative overflow-hidden">
-                  <div 
-                    className="bg-green-600 h-full rounded-full flex items-center justify-end pr-2"
-                    style={{ width: `${Math.max((item.count / Math.max(...stats.charts.jobGrowth.map(i => i.count))) * 100, 5)}%` }}
-                  >
-                    <span className="text-xs text-white font-medium">{item.count}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Role Distribution */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Phân bố vai trò</h3>
-          <div className="space-y-3">
-            {stats.charts.roleDistribution.map((item, index) => (
-              <div key={index}>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm font-medium text-gray-700 capitalize">{item.role}</span>
-                  <span className="text-sm font-semibold text-gray-900">{item.count}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 h-2 rounded-full"
-                    style={{ 
-                      width: `${(item.count / stats.charts.roleDistribution.reduce((sum, r) => sum + r.count, 0)) * 100}%` 
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Top Industries */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Top ngành nghề</h3>
-          <div className="space-y-3">
-            {stats.charts.topIndustries.map((item, index) => (
-              <div key={index}>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-sm font-medium text-gray-700">{item.industry}</span>
-                  <span className="text-sm font-semibold text-gray-900">{item.job_count} việc</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 h-2 rounded-full"
-                    style={{ 
-                      width: `${(item.job_count / Math.max(...stats.charts.topIndustries.map(i => i.job_count))) * 100}%` 
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Activities */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Hoạt động gần đây</h3>
-        <div className="space-y-3">
-          {stats.recentActivities.map((activity, index) => (
-            <div key={index} className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-              <div className={`p-2 rounded-full ${
-                activity.type === 'user' ? 'bg-blue-100' :
-                activity.type === 'job' ? 'bg-green-100' :
-                'bg-purple-100'
-              }`}>
-                {activity.type === 'user' && <LuUsers className="w-4 h-4 text-blue-600" />}
-                {activity.type === 'job' && <LuBriefcase className="w-4 h-4 text-green-600" />}
-                {activity.type === 'company' && <LuBuilding2 className="w-4 h-4 text-purple-600" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{activity.title}</p>
-                <p className="text-sm text-gray-600 truncate">{activity.description}</p>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-gray-500">
-                <LuClock className="w-3 h-3" />
-                <span>
-                  {new Date(activity.timestamp).toLocaleDateString('vi-VN', { 
-                    month: 'short', 
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </span>
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          <div className="bg-white border border-gray-100 p-6">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-4">Tăng trưởng công việc</p>
+            <div className="space-y-2">
+              {stats.charts.jobGrowth.map((item, index) => (
+                <div key={index} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500 w-16 font-mono">
+                    {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                  <div className="flex-1 bg-gray-50 h-8 relative overflow-hidden">
+                    <div 
+                      className="bg-gray-900 h-full flex items-center justify-end pr-3 transition-all"
+                      style={{ width: `${Math.max((item.count / Math.max(...stats.charts.jobGrowth.map(i => i.count))) * 100, 8)}%` }}
+                    >
+                      <span className="text-xs text-white font-medium">{item.count}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Distribution Analysis */}
+      <div>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Phân Bổ</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-white border border-gray-100 p-6">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-4">Vai trò người dùng</p>
+            <div className="space-y-4">
+              {stats.charts.roleDistribution.map((item, index) => (
+                <div key={index}>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-gray-600 capitalize">{item.role}</span>
+                    <span className="text-sm font-semibold text-gray-900">{item.count}</span>
+                  </div>
+                  <div className="w-full bg-gray-50 h-1.5">
+                    <div 
+                      className="bg-gray-900 h-1.5 transition-all"
+                      style={{ 
+                        width: `${(item.count / stats.charts.roleDistribution.reduce((sum, r) => sum + r.count, 0)) * 100}%` 
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-100 p-6">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-4">Ngành nghề hàng đầu</p>
+            <div className="space-y-4">
+              {stats.charts.topIndustries.map((item, index) => (
+                <div key={index}>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-gray-600">{item.industry}</span>
+                    <span className="text-sm font-semibold text-gray-900">{item.job_count}</span>
+                  </div>
+                  <div className="w-full bg-gray-50 h-1.5">
+                    <div 
+                      className="bg-gray-900 h-1.5 transition-all"
+                      style={{ 
+                        width: `${(item.job_count / Math.max(...stats.charts.topIndustries.map(i => i.job_count))) * 100}%` 
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

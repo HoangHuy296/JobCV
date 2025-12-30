@@ -205,9 +205,9 @@ const getJobById = async (req, res) => {
     
     const job = rows[0];
     
-    // Use query parameters for role-based access control
-    const role = req.query.role || 'guest';
-    const user_id = req.query.user_id;
+    // Use req.user for authenticated requests, fallback to query params for backward compatibility
+    const role = req.user?.role?.name || req.query.role || 'guest';
+    const user_id = req.user?.id || (req.query.user_id ? parseInt(req.query.user_id) : null);
     
     // 1. If the job is approved, anyone can see it
     if (job.version_status === 'approved') {
@@ -220,7 +220,7 @@ const getJobById = async (req, res) => {
         // Admin has full access - no restrictions
       }
       // Recruiters can only see their own jobs
-      else if (role === 'recruiter' && user_id && parseInt(user_id) === job.created_by) {
+      else if (role === 'recruiter' && user_id && user_id === job.created_by) {
         // Creator has access to their own job - no restrictions
       }
       // Other users cannot see unapproved jobs
@@ -684,22 +684,15 @@ const closeJob = async (req, res) => {
     
     // Send notifications and emails to all applicants
     if (applicants.length > 0) {
-      const notificationWS = req.app.get('notificationWS');
-      
       for (const applicant of applicants) {
-        // Create notification
-        const notification = await Notification.create({
+        // Create notification (WebSocket is automatically sent by Notification.create)
+        await Notification.create({
           user_id: applicant.user_id,
           title: 'Công việc đã đóng',
           message: `Công việc "${existingJob.title}" đã đóng. Đơn ứng tuyển của bạn đang được xem xét.`,
           type: 'info',
           link: `/bang-dieu-khien`
         });
-        
-        // Send WebSocket notification
-        if (notificationWS) {
-          notificationWS.sendToUser(applicant.user_id, notification);
-        }
         
         // Send email to applicant (only if they have email notifications enabled)
         if (applicant.user_email && applicant.email_notifications_enabled) {

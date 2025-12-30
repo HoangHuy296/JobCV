@@ -84,8 +84,16 @@ const JobPreview: React.FC = () => {
             setReviewAction(null);
             setFeedback('');
             
-            // Redirect to review management page
-            navigate('/admin/quan-ly-duyet-cong-viec');
+            // Close tab if multiple tabs are open, otherwise navigate
+            if (window.history.length > 1) {
+                window.close();
+                // If window.close() doesn't work (not opened by script), navigate instead
+                setTimeout(() => {
+                    navigate('/admin/quan-ly-cong-viec');
+                }, 100);
+            } else {
+                navigate('/admin/quan-ly-cong-viec');
+            }
         } catch (error: any) {
             console.error('Error reviewing job:', error);
             const errorMessage = error?.response?.data?.message || 'Lỗi khi duyệt công việc';

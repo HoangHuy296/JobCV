@@ -3,14 +3,18 @@ import { getUserFromToken, isTokenExpired } from '../utils/tokenUtils';
 import { getMyCompany } from '../api/companyService';
 import type { Company } from '../api/companyService';
 import { notificationWebSocket } from '../services/notificationWebSocket';
+import { authService } from '../api/authService';
 
 // Define the user type
 interface User {
   id: number;
   email: string;
   name: string;
-  role: string;
-  image: string | null;
+  role: any;
+  image: {
+    id: number;
+    url: string;
+  } | null;
   is_active: boolean;
   email_notifications_enabled?: boolean;
 }
@@ -43,7 +47,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = React.memo(({ chi
   });
 
   const [company, setCompany] = useState<Company | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => {
+    const token = localStorage.getItem('token');
+    return !!token && !isTokenExpired(token);
+  });
   const [companyLoading, setCompanyLoading] = useState(false);
 
   // Memoize isAuthenticated to prevent unnecessary re-renders
@@ -119,29 +126,40 @@ export const UserProvider: React.FC<{ children: ReactNode }> = React.memo(({ chi
             setCompany(null);
           }
         } else {
-          // Token is valid, set user data
-          const userData = getUserFromToken(token);
-          if (userData && userData.is_active) {
-            if (isMounted) {
-              setUser(userData);
-              // Connect to WebSocket for real-time notifications
-              notificationWebSocket.connect(token);
-              // If user is a recruiter, fetch their company
-              if (userData.role === 'recruiter') {
-                try {
-                  setCompanyLoading(true);
-                  const companyData = await getMyCompany();
-                  if (isMounted) setCompany(companyData);
-                } catch (error) {
-                  // If company not found, that's okay - company will remain null
-                  if (isMounted) setCompany(null);
-                } finally {
-                  if (isMounted) setCompanyLoading(false);
+          // Token is valid, fetch fresh user data from API
+          try {
+            const userData = await authService.getMe();
+            if (userData && userData.is_active) {
+              if (isMounted) {
+                userData.role = userData.role?.name ?? userData.role;
+                setUser(userData);
+                // Connect to WebSocket for real-time notifications
+                notificationWebSocket.connect(token);
+                // If user is a recruiter, fetch their company
+                if (userData.role === 'recruiter') {
+                  try {
+                    setCompanyLoading(true);
+                    const companyData = await getMyCompany();
+                    if (isMounted) setCompany(companyData);
+                  } catch (error) {
+                    // If company not found, that's okay - company will remain null
+                    if (isMounted) setCompany(null);
+                  } finally {
+                    if (isMounted) setCompanyLoading(false);
+                  }
                 }
               }
+            } else {
+              // If user is inactive, remove token
+              localStorage.removeItem('token');
+              if (isMounted) {
+                setUser(null);
+                setCompany(null);
+              }
             }
-          } else {
-            // If token is invalid or user is inactive, remove it
+          } catch (error) {
+            // If API call fails (e.g., token invalid), remove token and clear user
+            console.error('Error fetching user info:', error);
             localStorage.removeItem('token');
             if (isMounted) {
               setUser(null);

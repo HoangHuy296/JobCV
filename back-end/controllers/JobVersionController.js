@@ -466,6 +466,24 @@ exports.updateJobVersion = async (req, res) => {
 
     await JobVersion.update(versionId, updateData);
 
+    // If this is the current version, update the job record to sync data
+    if (job.current_version_id === versionId) {
+      await Job.update(jobId, {
+        title,
+        brief_description,
+        requirement,
+        benefits: benefits || '',
+        salary: salary || '',
+        date_end_register: date_end_register || null,
+        years_experienced: years_experienced || 0,
+        work_hours: work_hours || '',
+        company_id,
+        industry_id,
+        location: location || '',
+        status: updateData.status
+      });
+    }
+
     // If status changed to pending_review, update or create a review request
     if (version.status === 'rejected' && updateData.status === 'pending_review') {
       // Find an admin user to be the reviewer

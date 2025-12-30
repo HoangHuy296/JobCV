@@ -33,7 +33,7 @@ export interface CreateJobVersionData {
   requirement: string;
   benefits: string;
   salary: string;
-  date_end_register: string;
+  date_end_register?: string | null;
   years_experienced: number;
   work_hours: string;
   company_id: number;

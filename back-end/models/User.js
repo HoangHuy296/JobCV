@@ -38,7 +38,7 @@ class User {
                m.path as image_path, m.url as image_url
         FROM users u
         LEFT JOIN roles r ON u.role_id = r.id AND r.deleted_at IS NULL AND r.deleted = FALSE
-        LEFT JOIN media m ON u.image_id = m.id
+        LEFT JOIN media m ON u.image_id = m.id AND m.deleted = FALSE
         WHERE u.id = ? AND u.deleted_at IS NULL AND u.deleted = FALSE
       `;
       
@@ -135,7 +135,7 @@ class User {
                m.path as image_path, m.url as image_url
         FROM users u
         LEFT JOIN roles r ON u.role_id = r.id AND r.deleted_at IS NULL AND r.deleted = FALSE
-        LEFT JOIN media m ON u.image_id = m.id
+        LEFT JOIN media m ON u.image_id = m.id AND m.deleted = FALSE
         WHERE u.id = ? AND u.deleted_at IS NULL AND u.deleted = FALSE
       `;
       
@@ -302,7 +302,7 @@ class User {
                m.path as image_path, m.url as image_url
         FROM users u
         LEFT JOIN roles r ON u.role_id = r.id AND r.deleted_at IS NULL AND r.deleted = FALSE
-        LEFT JOIN media m ON u.image_id = m.id
+        LEFT JOIN media m ON u.image_id = m.id AND m.deleted = FALSE
         WHERE u.deleted_at IS NULL AND u.deleted = FALSE
       `;
       const values = [];

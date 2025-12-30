@@ -16,7 +16,6 @@ import CompanyDetail from '../pages/public/CompanyDetail';
 import JobListing from '../pages/public/JobListing';
 import JobDetail from '../pages/public/JobDetail';
 import JobPreview from '../pages/public/JobPreview';
-import CVPreview from '../pages/public/CVPreview';
 import NotFound from '../pages/public/NotFound';
 // User pages
 import UserDashboard from '../pages/user/UserDashboard';
@@ -35,6 +34,7 @@ import CampaignManagement from '../pages/recruiter/campaign/CampaignManagement';
 import CampaignDetail from '../pages/recruiter/campaign/CampaignDetail';
 import JobApplications from '../pages/recruiter/job/JobApplications';
 import CVApplicationsManagement from '../pages/recruiter/CVApplicationsManagement';
+import CandidateSearch from '../pages/recruiter/CandidateSearch';
 
 // Layout wrappers for nested routes
 const PublicLayoutWrapper: React.FC = () => (
@@ -80,7 +80,6 @@ const AppRouter: React.FC = () => {
           <Route path="/viec-lam" element={<JobListing />} />
           <Route path="/viec-lam/:id" element={<JobDetail />} />
           <Route path="/viec-lam/preview/:id" element={<JobPreview />} />
-          <Route path="/cv/preview/:cvId" element={<CVPreview />} />
         </Route>
 
         {/* User routes */}
@@ -111,6 +110,7 @@ const AppRouter: React.FC = () => {
           <Route path="/nha-tuyen-dung/quan-ly-tin-tuyen-dung" element={<RecruiterJobManagement />} />
           <Route path="/nha-tuyen-dung/quan-ly-tin-tuyen-dung/:jobId/ung-vien" element={<JobApplications />} />
           <Route path="/nha-tuyen-dung/quan-ly-cv-ung-tuyen" element={<CVApplicationsManagement />} />
+          <Route path="/nha-tuyen-dung/tim-kiem-ung-vien" element={<CandidateSearch />} />
           <Route path="/nha-tuyen-dung/quan-ly-chien-dich" element={<CampaignManagement />} />
           <Route path="/nha-tuyen-dung/chien-dich/:id" element={<CampaignDetail />} />
           <Route path="/nha-tuyen-dung/quan-ly-cv" element={<RecruiterCVManagement />} />

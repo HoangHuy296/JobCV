@@ -216,15 +216,23 @@ const NotificationBell: React.FC = React.memo(() => {
         );
       }
       
-      // Only admins can navigate via notification links
-      if (notification.link && isAdmin) {
-        navigate(notification.link);
-        setIsOpen(false);
+      // Handle navigation based on role and notification type
+      if (notification.link) {
+        // For recruiters: redirect application-related notifications to CV Applications Management
+        if (user?.role === 'recruiter' && notification.type === 'application') {
+          navigate('/nha-tuyen-dung/quan-ly-cv-ung-tuyen');
+          setIsOpen(false);
+        }
+        // For admins: use the notification link
+        else if (isAdmin) {
+          navigate(notification.link);
+          setIsOpen(false);
+        }
       }
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
-  }, [navigate, isAdmin]);
+  }, [navigate, isAdmin, user]);
 
   // Handle mark all as read
   const handleMarkAllAsRead = useCallback(async () => {
@@ -296,6 +304,11 @@ const NotificationBell: React.FC = React.memo(() => {
         bg: 'bg-indigo-100',
         color: 'text-indigo-600',
         Icon: LuFileCheck
+      },
+      application: {
+        bg: 'bg-teal-100',
+        color: 'text-teal-600',
+        Icon: LuBriefcase
       },
       system: {
         bg: 'bg-gray-100',

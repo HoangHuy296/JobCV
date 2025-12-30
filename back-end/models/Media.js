@@ -106,18 +106,63 @@ class Media extends BaseModel {
   static async getAllMedia(page = 1, limit = 10, search = '') {
     const offset = (page - 1) * limit;
     
-    let query = `SELECT * FROM ${this.table} WHERE deleted = FALSE`;
+    let query = `
+      SELECT m.*,
+        u.id as user_id, u.name as user_name, u.email as user_email,
+        c.id as company_id, c.name as company_name
+      FROM ${this.table} m
+      LEFT JOIN users u ON m.id = u.image_id AND u.deleted = FALSE
+      LEFT JOIN companies c ON m.id = c.logo_id AND c.deleted = FALSE
+      WHERE m.deleted = FALSE
+    `;
     const params = [];
     
     if (search) {
-      query += ' AND (filename LIKE ? OR original_name LIKE ?)';
+      query += ' AND (m.filename LIKE ? OR m.original_name LIKE ?)';
       params.push(`%${search}%`, `%${search}%`);
     }
     
-    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    query += ' ORDER BY m.created_at DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
     
-    const [media] = await db.query(query, params);
+    const [rows] = await db.query(query, params);
+    
+    // Transform results to include entity information
+    const media = rows.map(row => {
+      const mediaData = {
+        id: row.id,
+        filename: row.filename,
+        original_name: row.original_name,
+        mime_type: row.mime_type,
+        size: row.size,
+        path: row.path,
+        url: row.url,
+        storage_type: row.storage_type,
+        created_by: row.created_by,
+        created_at: row.created_at,
+        modified_at: row.modified_at,
+        used_by: []
+      };
+      
+      if (row.user_id) {
+        mediaData.used_by.push({
+          entity_type: 'user',
+          entity_id: row.user_id,
+          entity_name: row.user_name,
+          entity_email: row.user_email
+        });
+      }
+      
+      if (row.company_id) {
+        mediaData.used_by.push({
+          entity_type: 'company',
+          entity_id: row.company_id,
+          entity_name: row.company_name
+        });
+      }
+      
+      return mediaData;
+    });
     
     // Get total count
     let countQuery = `SELECT COUNT(*) as total FROM ${this.table} WHERE deleted = FALSE`;

@@ -133,7 +133,7 @@ class Job {
              u.name as creator_name
       FROM jobs j
       LEFT JOIN companies c ON j.company_id = c.id
-      LEFT JOIN media m ON c.logo_id = m.id
+      LEFT JOIN media m ON c.logo_id = m.id AND m.deleted = FALSE
       LEFT JOIN industries i ON j.industry_id = i.id
       LEFT JOIN job_versions jv ON j.current_version_id = jv.id
       LEFT JOIN users u ON j.created_by = u.id

@@ -7,9 +7,9 @@ const { getAllCVs, getUserCVs, uploadCV, downloadCV, deleteCV, checkCVInApplicat
 const authenticate = require('../middleware/auth');
 const optionalAuth = require('../middleware/optionalAuth');
 
-// Middleware to check admin role
-const requireAdmin = (req, res, next) => {
-  if (req.user.role.name !== 'admin') {
+// Middleware to check admin or recruiter role
+const requireAdminOrRecruiter = (req, res, next) => {
+  if (req.user.role.name !== 'admin' && req.user.role.name !== 'recruiter') {
     return res.status(403).json({ 
       success: false, 
       message: 'Bạn không có quyền truy cập' 
@@ -115,8 +115,8 @@ const upload = multer({
  *       500:
  *         description: Server error
  */
-// Admin route - get all CVs
-router.get('/admin/all', authenticate, requireAdmin, getAllCVs);
+// Admin and Recruiter route - get all CVs
+router.get('/admin/all', authenticate, requireAdminOrRecruiter, getAllCVs);
 
 // User route - get user's CVs
 router.get('/', authenticate, getUserCVs);

@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS cv_sections (
 );
 `;
 
-// Create cv_template_sections table - Link templates with sections
+// Create cv_template_sections table - Link templates with sections (without FK constraints)
 const createTemplatesSectionsTable = `
 CREATE TABLE IF NOT EXISTS cv_template_sections (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -37,8 +37,6 @@ CREATE TABLE IF NOT EXISTS cv_template_sections (
   display_order INT DEFAULT 0 COMMENT 'Thứ tự hiển thị trong template',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   modified_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (template_id) REFERENCES cv_templates(id) ON DELETE CASCADE,
-  FOREIGN KEY (section_id) REFERENCES cv_sections(id) ON DELETE CASCADE,
   INDEX idx_template_id (template_id),
   INDEX idx_section_id (section_id),
   UNIQUE KEY unique_template_section (template_id, section_id)

@@ -338,11 +338,44 @@ const resendVerification = async (req, res) => {
   }
 };
 
+// Get current user info (with latest data from database)
+const getMe = async (req, res) => {
+  try {
+    // req.user is set by auth middleware from token
+    const userId = req.user.id;
+    
+    // Fetch fresh user data from database (including latest image)
+    const user = await User.getUserWithRole(userId);
+    
+    if (!user) {
+      return res.status(404).json({ result: null, message: 'Người dùng không tồn tại' });
+    }
+    
+    // Return user data in same format as token
+    res.json({
+      result: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        image: user.image,
+        is_active: user.is_active,
+        email_notifications_enabled: user.email_notifications_enabled
+      },
+      message: null
+    });
+  } catch (error) {
+    console.error('Error fetching current user:', error);
+    res.status(500).json({ result: null, message: 'Lấy thông tin người dùng thất bại' });
+  }
+};
+
 module.exports = {
   login,
   register,
   forgotPassword,
   resetPassword,
   verifyEmail,
-  resendVerification
+  resendVerification,
+  getMe
 };

@@ -682,7 +682,7 @@ const sendNewApplicationEmail = async (recruiterEmail, recruiterName, applicantN
               <p>Vui lòng đăng nhập vào hệ thống để xem chi tiết đơn ứng tuyển và hồ sơ của ứng viên.</p>
               
               <div style="text-align: center; margin: 20px 0;">
-                <a href="${frontendUrl}/nha-tuyen-dung/quan-ly-cong-viec" style="display: inline-block; padding: 15px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Xem Đơn Ứng Tuyển</a>
+                <a href="${frontendUrl}/nha-tuyen-dung/quan-ly-tin-tuyen-dung" style="display: inline-block; padding: 15px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Xem Đơn Ứng Tuyển</a>
               </div>
               
               <p>Trân trọng,<br>
@@ -927,7 +927,7 @@ const sendThresholdReachedEmail = async (recruiterEmail, recruiterName, jobTitle
               <p>Vui lòng đăng nhập vào hệ thống để quản lý các đơn ứng tuyển và xem xét ứng viên.</p>
               
               <div style="text-align: center; margin: 20px 0;">
-                <a href="${frontendUrl}/nha-tuyen-dung/quan-ly-cong-viec" style="display: inline-block; padding: 15px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Quản Lý Ứng Viên</a>
+                <a href="${frontendUrl}/nha-tuyen-dung/quan-ly-tin-tuyen-dung" style="display: inline-block; padding: 15px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Quản Lý Ứng Viên</a>
               </div>
               
               <p>Trân trọng,<br>

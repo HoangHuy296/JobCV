@@ -251,7 +251,7 @@ const ReportModal: React.FC<ReportModalProps> = ({
                     <div className="flex items-center">
                       {user.image ? (
                         <img 
-                          src={user.image} 
+                          src={user.image?.url} 
                           alt={user.name} 
                           className="h-10 w-10 rounded-full mr-3 border-2 border-blue-200"
                         />

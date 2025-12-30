@@ -34,7 +34,7 @@ class Company {
              m.url as logo_url
       FROM companies c
       LEFT JOIN company_industries ci ON c.id = ci.company_id
-      LEFT JOIN media m ON c.logo_id = m.id
+      LEFT JOIN media m ON c.logo_id = m.id AND m.deleted = FALSE
       WHERE c.deleted_at IS NULL AND c.deleted = FALSE
     `;
     const values = [];
@@ -193,7 +193,7 @@ class Company {
              m.url as logo_url
       FROM companies c
       LEFT JOIN company_industries ci ON c.id = ci.company_id
-      LEFT JOIN media m ON c.logo_id = m.id
+      LEFT JOIN media m ON c.logo_id = m.id AND m.deleted = FALSE
       WHERE c.deleted_at IS NULL AND c.deleted = FALSE
       GROUP BY c.id
       ORDER BY c.created_at DESC
@@ -253,7 +253,7 @@ class Company {
              m.url as logo_url
       FROM companies c
       LEFT JOIN company_industries ci ON c.id = ci.company_id
-      LEFT JOIN media m ON c.logo_id = m.id
+      LEFT JOIN media m ON c.logo_id = m.id AND m.deleted = FALSE
       WHERE c.id = ? AND c.deleted_at IS NULL AND c.deleted = FALSE
       GROUP BY c.id
     `;
@@ -313,7 +313,7 @@ class Company {
              m.url as logo_url
       FROM companies c
       LEFT JOIN company_industries ci ON c.id = ci.company_id
-      LEFT JOIN media m ON c.logo_id = m.id
+      LEFT JOIN media m ON c.logo_id = m.id AND m.deleted = FALSE
       WHERE c.created_by = ? AND c.deleted_at IS NULL AND c.deleted = FALSE
       GROUP BY c.id
     `;

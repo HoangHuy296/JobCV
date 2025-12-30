@@ -1,5 +1,6 @@
 import React from 'react';
 import { useUser } from '../../contexts/UserContext';
+import { useNavigate } from 'react-router-dom';
 
 type UserDashboardProps = {
   // Add any props if needed
@@ -7,48 +8,106 @@ type UserDashboardProps = {
 
 const UserDashboard: React.FC<UserDashboardProps> = () => {
   const { user } = useUser();
+  const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow px-4 py-5 sm:p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Bảng điều khiển Người dùng</h1>
+    <div className="space-y-8 max-w-[1400px]">
+      {/* Header */}
+      <div className="flex items-end justify-between border-b border-gray-200 pb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Bảng Điều Khiển Của Tôi</h1>
+          <p className="text-sm text-gray-500 mt-2">
+            Xin chào, {user?.name}
+          </p>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Thao Tác Nhanh</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button
+            onClick={() => navigate('/profile')}
+            className="bg-white border border-gray-100 p-6 hover:border-gray-200 transition-all text-left group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">→</span>
+            </div>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Hồ sơ của tôi</h3>
+            <p className="text-xs text-gray-500">Quản lý thông tin cá nhân</p>
+          </button>
+          
+          <button
+            onClick={() => navigate('/applications')}
+            className="bg-white border border-gray-100 p-6 hover:border-gray-200 transition-all text-left group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">→</span>
+            </div>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Đơn ứng tuyển</h3>
+            <p className="text-xs text-gray-500">Theo dõi trạng thái ứng tuyển</p>
+          </button>
+          
+          <button
+            onClick={() => navigate('/cv')}
+            className="bg-white border border-gray-100 p-6 hover:border-gray-200 transition-all text-left group"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">→</span>
+            </div>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">CV của tôi</h3>
+            <p className="text-xs text-gray-500">Tạo và quản lý CV</p>
+          </button>
+        </div>
+      </div>
+
+      {/* Activity Summary */}
+      <div>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Tổng Quan Hoạt Động</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white border border-gray-100 p-6">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Đơn ứng tuyển</p>
+            <p className="text-3xl font-bold text-gray-900 tracking-tight">0</p>
+            <p className="text-xs text-gray-500 mt-1">Tổng số đã nộp</p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-blue-50 rounded-lg p-6">
-              <h2 className="text-lg font-semibold text-blue-800 mb-2">Hồ sơ của tôi</h2>
-              <p className="text-blue-600">Quản lý thông tin cá nhân và hồ sơ</p>
-              <button className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
-                Xem hồ sơ
-              </button>
-            </div>
-            
-            <div className="bg-green-50 rounded-lg p-6">
-              <h2 className="text-lg font-semibold text-green-800 mb-2">Công việc đã ứng tuyển</h2>
-              <p className="text-green-600">Xem trạng thái các tin tuyển dụng bạn đã ứng tuyển</p>
-              <button className="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
-                Xem ứng tuyển
-              </button>
-            </div>
-            
-            <div className="bg-purple-50 rounded-lg p-6">
-              <h2 className="text-lg font-semibold text-purple-800 mb-2">CV của tôi</h2>
-              <p className="text-purple-600">Quản lý và tạo CV của bạn</p>
-              <button className="mt-4 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">
-                Xem CV
-              </button>
-            </div>
+          <div className="bg-white border border-gray-100 p-6">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">CV đã tạo</p>
+            <p className="text-3xl font-bold text-gray-900 tracking-tight">0</p>
+            <p className="text-xs text-gray-500 mt-1">CV đang hoạt động</p>
           </div>
           
-          <div className="mt-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Chào mừng {user?.name}!</h2>
-            <p className="text-gray-600">
-              Đây là bảng điều khiển dành riêng cho người dùng. Bạn có thể quản lý hồ sơ, 
-              xem tin tuyển dụng đã ứng tuyển và quản lý CV từ đây.
-            </p>
+          <div className="bg-white border border-gray-100 p-6">
+            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Lượt xem hồ sơ</p>
+            <p className="text-3xl font-bold text-gray-900 tracking-tight">0</p>
+            <p className="text-xs text-gray-500 mt-1">30 ngày qua</p>
           </div>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Hoạt Động Gần Đây</h2>
+        <div className="bg-white border border-gray-100 p-8 text-center">
+          <svg className="h-12 w-12 text-gray-300 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <p className="text-sm text-gray-500 mb-4">Chưa có hoạt động gần đây</p>
+          <button 
+            onClick={() => navigate('/jobs')}
+            className="text-sm text-gray-900 border border-gray-200 px-4 py-2 hover:bg-gray-50 transition-colors"
+          >
+            Tìm kiếm công việc
+          </button>
         </div>
       </div>
     </div>

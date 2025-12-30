@@ -177,7 +177,7 @@ class CVTemplateController {
       }
       
       // Check permission (admin hoặc creator)
-      if (req.user.role !== 'admin' && template.created_by !== req.user.id) {
+      if (req.user.role?.name !== 'admin' && template.created_by !== req.user.id) {
         return res.status(403).json({
           success: false,
           message: 'Bạn không có quyền cập nhật template này'
@@ -221,7 +221,7 @@ class CVTemplateController {
       }
       
       // Check permission (admin hoặc creator)
-      if (req.user.role !== 'admin' && template.created_by !== req.user.id) {
+      if (req.user.role?.name !== 'admin' && template.created_by !== req.user.id) {
         return res.status(403).json({
           success: false,
           message: 'Bạn không có quyền xóa template này'
@@ -877,7 +877,7 @@ class CVTemplateController {
           if (sectionData && Object.keys(sectionData).length > 0) {
             // Get section info for position
             const [sectionInfo] = await connection.query(
-              `SELECT ts.position, ts.is_visible, ts.display_order
+              `SELECT ts.position, ts.display_order
                FROM cv_template_sections ts
                WHERE ts.template_id = (SELECT template_id FROM cvs WHERE id = ?)
                AND ts.section_id = ?`,
@@ -893,7 +893,7 @@ class CVTemplateController {
                   sectionId,
                   JSON.stringify(sectionInfo[0].position || { x: 0, y: 0, width: 100, height: 20 }),
                   JSON.stringify(sectionData),
-                  sectionInfo[0].is_visible !== false,
+                  true,
                   sectionInfo[0].display_order || 0
                 ]
               );
@@ -906,7 +906,7 @@ class CVTemplateController {
       
       res.json({
         success: true,
-        message: 'Cập nhật CV thành công'
+        message: ''
       });
     } catch (error) {
       await connection.rollback();

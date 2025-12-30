@@ -411,23 +411,18 @@ const deleteCV = async (req, res) => {
         [id, userId]
       );
       
-      // Notify recruiters about CV deletion
-      const notificationWS = req.app.get('notificationWS');
+      // Notify recruiters about CV deletion (WebSocket is automatically sent by Notification.create)
       const notifiedRecruiters = new Set();
       
       for (const app of applications) {
         if (app.recruiter_id && !notifiedRecruiters.has(app.recruiter_id)) {
-          const notification = await Notification.create({
+          await Notification.create({
             user_id: app.recruiter_id,
             title: 'Ứng viên đã xóa CV',
             message: `${req.user.name} đã xóa CV được sử dụng trong đơn ứng tuyển cho công việc "${app.job_title}"`,
             type: 'warning',
-            link: `/nha-tuyen-dung/quan-ly-cong-viec`
+            link: `/nha-tuyen-dung/quan-ly-tin-tuyen-dung`
           });
-          
-          if (notificationWS) {
-            notificationWS.sendToUser(app.recruiter_id, notification);
-          }
           
           notifiedRecruiters.add(app.recruiter_id);
         }

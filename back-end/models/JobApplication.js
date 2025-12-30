@@ -74,7 +74,7 @@ class JobApplication {
         FROM job_applications ja
         LEFT JOIN users u ON ja.user_id = u.id
         LEFT JOIN cvs cv ON ja.cv_id = cv.id
-        LEFT JOIN media m ON u.image_id = m.id
+        LEFT JOIN media m ON u.image_id = m.id AND m.deleted = FALSE
         WHERE ja.job_id = ?
       `;
       const params = [jobId];

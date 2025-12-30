@@ -1,20 +1,24 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { LuArrowLeft, LuEye, LuDownload, LuCheck, LuX, LuClock, LuUser, LuMail, LuPhone, LuCalendar } from 'react-icons/lu';
 import { getJobById, type Job } from '../../../api/jobService';
 import { getJobApplications, updateApplicationStatus, type JobApplication } from '../../../api/jobApplicationService';
 import { formatDate } from '../../../utils/dateUtils';
+import CVPreviewModal from '../../../components/cv/CVPreviewModal';
 
 const JobApplications: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [loading, setLoading] = useState(true);
   const [job, setJob] = useState<Job | null>(null);
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [showCVPreviewModal, setShowCVPreviewModal] = useState(false);
+  const [previewCvId, setPreviewCvId] = useState<number | null>(null);
 
   const fetchJobAndApplications = useCallback(async () => {
     if (!jobId) return;
@@ -83,8 +87,8 @@ const JobApplications: React.FC = () => {
       toast.warning('Ứng viên chưa đính kèm CV');
       return;
     }
-    // Open CV preview page
-    window.open(`/cv/preview/${cvId}`, '_blank');
+    setPreviewCvId(cvId);
+    setShowCVPreviewModal(true);
   }, []);
 
   const getStatusBadge = (status: string) => {
@@ -174,7 +178,10 @@ const JobApplications: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/nha-tuyen-dung/quan-ly-tin-tuyen-dung')}
+                onClick={() => {
+                  const from = (location.state as any)?.from;
+                  navigate(from || '/nha-tuyen-dung/quan-ly-tin-tuyen-dung');
+                }}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <LuArrowLeft className="w-5 h-5" />
@@ -389,6 +396,18 @@ const JobApplications: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* CV Preview Modal */}
+      {previewCvId && (
+        <CVPreviewModal
+          isOpen={showCVPreviewModal}
+          onClose={() => {
+            setShowCVPreviewModal(false);
+            setPreviewCvId(null);
+          }}
+          cvId={previewCvId}
+        />
+      )}
     </div>
   );
 };

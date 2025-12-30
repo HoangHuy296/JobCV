@@ -264,7 +264,7 @@ const JobManagement: React.FC = () => {
         requirement: updatedJob.requirement,
         benefits: updatedJob.benefits || '',
         salary: updatedJob.salary || '',
-        date_end_register: updatedJob.date_end_register || "",
+        date_end_register: updatedJob.date_end_register || null,
         years_experienced: updatedJob.years_experienced ? parseInt((updatedJob as any).years_experienced) : 0,
         work_hours: updatedJob.work_hours || '',
         company_id: (company?.id || 0), // For recruiter, use their own ID as company_id

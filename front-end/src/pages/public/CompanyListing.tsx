@@ -15,7 +15,7 @@ const CompanyListing: React.FC = () => {
   const [totalItems, setTotalItems] = useState(0);
   
   const [currentPage, setCurrentPage] = useState(1);
-  const companiesPerPage = 4;
+  const companiesPerPage = 6;
   
   // Industry filter scrolling state
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -280,9 +280,9 @@ const CompanyListing: React.FC = () => {
               {currentCompanies.map((company) => (
                 <div 
                   key={company.id} 
-                  className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:border-blue-300 group transform hover:-translate-y-1"
+                  className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 border border-gray-100 hover:border-blue-300 group transform hover:-translate-y-1 flex flex-col"
                 >
-                  <div className="p-6">
+                  <div className="p-6 flex flex-col flex-1">
                     <div className="flex items-start">
                       <div className="flex-shrink-0 h-16 w-16 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center border-2 border-white shadow-md">
                         {company.logo?.url ? (
@@ -324,7 +324,7 @@ const CompanyListing: React.FC = () => {
                     <p className="text-gray-600 mt-4 text-sm line-clamp-3 leading-relaxed"
                       dangerouslySetInnerHTML={{ __html: company.description }}></p>
                     
-                    <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
+                    <div className="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between">
                       <div className="flex items-center text-sm text-gray-500">
                         <svg className="flex-shrink-0 mr-2 h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />

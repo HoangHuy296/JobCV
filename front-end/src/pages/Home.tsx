@@ -177,9 +177,9 @@ const Home: React.FC = () => {
               <div
                 key={job.id}
                 onClick={() => navigate(`/viec-lam/${btoa(job.id.toString())}`)}
-                className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer group border border-gray-100 hover:border-blue-200"
+                className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer group border border-gray-100 hover:border-blue-200 flex flex-col"
               >
-                <div className="p-6">
+                <div className="p-6 flex flex-col flex-1">
                   {/* Company Logo */}
                   <div className="flex items-start gap-4 mb-4">
                     <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center flex-shrink-0">
@@ -216,7 +216,7 @@ const Home: React.FC = () => {
                   </div>
 
                   {/* Tags */}
-                  <div className="flex flex-wrap gap-2 mb-4">
+                  <div className="flex flex-wrap gap-2 mb-4 flex-grow">
                     {job.industry_name && (
                       <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-medium rounded-full">
                         {job.industry_name}
@@ -230,7 +230,7 @@ const Home: React.FC = () => {
                   </div>
 
                   {/* Action Button */}
-                  <button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2.5 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 flex items-center justify-center gap-2">
+                  <button className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2.5 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 flex items-center justify-center gap-2 mt-auto">
                     Xem chi tiết
                     <LuArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </button>
@@ -279,7 +279,7 @@ const Home: React.FC = () => {
                         {company.name}
                       </h3>
                       <div className="flex items-center text-sm text-gray-500 mt-1">
-                        <LuMapPin className="w-4 h-4 mr-1" />
+                        <LuMapPin className="min-w-[1.25rem] w-5 max-w-[1.25rem] min-h-[1.25rem] h-5 max-h-[1.25rem] mr-1 flex-shrink-0" />
                         <span className="line-clamp-1">{company.location}</span>
                       </div>
                     </div>

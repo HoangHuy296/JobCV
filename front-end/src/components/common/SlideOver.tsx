@@ -78,6 +78,28 @@ const SlideOver: React.FC<SlideOverProps> = ({
           } else {
             data[field.name] = field.defaultValue ?? false;
           }
+        } else if (field.type === 'datetime') {
+          // For datetime fields, format the date to YYYY-MM-DD for input[type="date"]
+          const dateValue = initialValues[field.name];
+          if (dateValue) {
+            try {
+              // Handle various date formats
+              const date = new Date(dateValue);
+              if (!isNaN(date.getTime())) {
+                // Format to YYYY-MM-DD
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                data[field.name] = `${year}-${month}-${day}`;
+              } else {
+                data[field.name] = field.defaultValue ?? '';
+              }
+            } catch (e) {
+              data[field.name] = field.defaultValue ?? '';
+            }
+          } else {
+            data[field.name] = field.defaultValue ?? '';
+          }
         } else {
           data[field.name] = initialValues[field.name] ?? field.defaultValue ?? '';
         }

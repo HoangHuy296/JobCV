@@ -7,6 +7,7 @@ const MediaManagement: React.FC = () => {
   const [mediaList, setMediaList] = useState<Media[]>([]);
   const [loading, setLoading] = useState(true);
   const hasFetchedData = useRef(false);
+  const [previewMedia, setPreviewMedia] = useState<Media | null>(null);
   
   // Pagination and filtering state
   const [currentPage, setCurrentPage] = useState(1);
@@ -132,6 +133,31 @@ const MediaManagement: React.FC = () => {
       )
     },
     { 
+      key: 'used_by' as keyof Media, 
+      title: 'Thuộc entity',
+      render: (_value: unknown, record: Media) => (
+        <div className="text-sm">
+          {record.used_by && record.used_by.length > 0 ? (
+            <div className="space-y-1">
+              {record.used_by.map((entity, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    {entity.entity_type === 'user' ? '👤' : '🏢'} {entity.entity_type}
+                  </span>
+                  <span className="text-gray-700">{entity.entity_name}</span>
+                  {entity.entity_email && (
+                    <span className="text-gray-500 text-xs">({entity.entity_email})</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <span className="text-gray-400">Chưa sử dụng</span>
+          )}
+        </div>
+      )
+    },
+    { 
       key: 'mime_type' as keyof Media, 
       title: 'Loại file'
     },
@@ -160,19 +186,106 @@ const MediaManagement: React.FC = () => {
   }), [searchTerm]);
 
   return (
-    <DataManagement<Media>
-      title="Quản lý Media"
-      data={mediaList}
-      columns={columns}
-      formFields={[]}
-      loading={loading}
-      onDelete={handleDelete}
-      onRefresh={() => fetchData(1, true)}
-      pagination={paginationData}
-      filters={filterData}
-      onCreate={undefined}
-      onEdit={undefined}
-    />
+    <>
+      <DataManagement<Media>
+        title="Quản lý Media"
+        data={mediaList}
+        columns={columns}
+        formFields={[]}
+        loading={loading}
+        onDelete={handleDelete}
+        onRefresh={() => fetchData(1, true)}
+        pagination={paginationData}
+        filters={filterData}
+        onCreate={undefined}
+        onEdit={undefined}
+        action={{
+          additionalActions: (media: Media) => 
+            media.mime_type.startsWith('image/') ? [
+              {
+                label: 'Xem trước',
+                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+                onClick: () => setPreviewMedia(media),
+                className: 'text-blue-600 hover:text-blue-900 cursor-pointer',
+                type: 'default' as const
+              }
+            ] : []
+        }}
+      />
+
+      {previewMedia && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black opacity-70 transition-opacity"
+            onClick={() => setPreviewMedia(null)}
+          ></div>
+          
+          <div 
+            className="relative bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-auto shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold">{previewMedia.original_name}</h3>
+                <p className="text-sm text-gray-500">{previewMedia.filename}</p>
+              </div>
+              <button
+                onClick={() => setPreviewMedia(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-4">
+                <img 
+                  src={previewMedia.url} 
+                  alt={previewMedia.original_name}
+                  className="max-w-full h-auto rounded-lg shadow-lg"
+                  style={{ maxHeight: '60vh' }}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-semibold">Loại file:</span> {previewMedia.mime_type}
+                </div>
+                <div>
+                  <span className="font-semibold">Kích thước:</span> {formatFileSize(previewMedia.size)}
+                </div>
+                <div>
+                  <span className="font-semibold">Ngày tải lên:</span> {new Date(previewMedia.created_at).toLocaleString('vi-VN')}
+                </div>
+                <div>
+                  <span className="font-semibold">Người tải:</span> {previewMedia.created_by ? `User ID: ${previewMedia.created_by}` : 'Hệ thống'}
+                </div>
+                {previewMedia.used_by && previewMedia.used_by.length > 0 && (
+                  <div className="col-span-2">
+                    <span className="font-semibold">Đang được sử dụng bởi:</span>
+                    <div className="mt-2 space-y-2">
+                      {previewMedia.used_by.map((entity, idx) => (
+                        <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                          <span className="inline-flex items-center px-2 py-1 rounded text-sm font-medium bg-blue-100 text-blue-800">
+                            {entity.entity_type === 'user' ? '👤 User' : '🏢 Company'}
+                          </span>
+                          <div>
+                            <div className="font-medium">{entity.entity_name}</div>
+                            {entity.entity_email && (
+                              <div className="text-xs text-gray-500">{entity.entity_email}</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

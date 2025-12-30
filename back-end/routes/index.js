@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getAllUsers, getUserById, createUser, updateUser, deleteUser, setUserActiveStatus } = require('../controllers/UserController');
 const { getAllRoles, getRoleById, createRole, updateRole, deleteRole } = require('../controllers/RoleController');
-const { login, register, forgotPassword, resetPassword, verifyEmail, resendVerification } = require('../controllers/AuthController');
+const { login, register, forgotPassword, resetPassword, verifyEmail, resendVerification, getMe } = require('../controllers/AuthController');
 const { getAdminDashboardStats } = require('../controllers/DashboardController');
 const authenticate = require('../middleware/auth');
 
@@ -668,6 +668,48 @@ router.post('/auth/verify-email', verifyEmail);
  *         description: Email is required or account already activated
  */
 router.post('/auth/resend-verification', resendVerification);
+
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Get current user info with latest data from database
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User info retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 result:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     email:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     role:
+ *                       type: object
+ *                     image:
+ *                       type: object
+ *                       nullable: true
+ *                     is_active:
+ *                       type: boolean
+ *                 message:
+ *                   type: string
+ *                   nullable: true
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ */
+router.get('/auth/me', authenticate, getMe);
 
 // Dashboard routes
 /**

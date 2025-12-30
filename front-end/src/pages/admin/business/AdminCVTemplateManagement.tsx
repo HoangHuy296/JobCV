@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { LuPlus, LuPencil, LuTrash2, LuEye, LuSave, LuX, LuUpload, LuImage, LuRefreshCw, LuEyeOff, LuArrowLeft } from 'react-icons/lu';
+import { LuPlus, LuPencil, LuTrash2, LuEye, LuSave, LuX, LuUpload, LuImage, LuRefreshCw, LuEyeOff, LuArrowLeft, LuSearch, LuFilter } from 'react-icons/lu';
+import SelectWithSearch from '../../../components/common/SelectWithSearch';
+import ConfirmModal from '../../../components/common/ConfirmModal';
 import { 
   getAllTemplates, 
   createTemplate, 
@@ -33,6 +35,8 @@ const AdminCVTemplateManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showEditor, setShowEditor] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [publishFilter, setPublishFilter] = useState<string>('all');
   
   // Editor states
   const [templateName, setTemplateName] = useState('');
@@ -43,6 +47,8 @@ const AdminCVTemplateManagement: React.FC = () => {
   const [availableSections, setAvailableSections] = useState<CVSection[]>([]);
   const [saving, setSaving] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<number | null>(null);
 
   useEffect(() => {
     fetchTemplates();
@@ -245,15 +251,23 @@ const AdminCVTemplateManagement: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa template này?')) return;
+    setTemplateToDelete(id);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!templateToDelete) return;
 
     try {
-      await deleteTemplate(id);
+      await deleteTemplate(templateToDelete);
       toast.success('Xóa template thành công!');
       fetchTemplates();
     } catch (error: any) {
       console.error('Error deleting template:', error);
       toast.error(error.response?.data?.message || 'Lỗi khi xóa template');
+    } finally {
+      setDeleteModalOpen(false);
+      setTemplateToDelete(null);
     }
   };
 
@@ -269,6 +283,21 @@ const AdminCVTemplateManagement: React.FC = () => {
       toast.error(error.response?.data?.message || 'Lỗi khi cập nhật trạng thái');
     }
   };
+
+  // Filter templates based on search and publish status
+  const filteredTemplates = React.useMemo(() => {
+    return templates.filter(template => {
+      const matchesSearch = searchTerm === '' ||
+        template.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        template.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesPublish = publishFilter === 'all' || 
+        (publishFilter === 'published' && template.is_published) ||
+        (publishFilter === 'draft' && !template.is_published);
+      
+      return matchesSearch && matchesPublish;
+    });
+  }, [templates, searchTerm, publishFilter]);
 
   if (showEditor) {
     return (
@@ -453,28 +482,87 @@ const AdminCVTemplateManagement: React.FC = () => {
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Quản lý CV Templates</h1>
-          <p className="text-gray-600 mt-1">Tạo và quản lý các template CV cho người dùng</p>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Quản lý CV Templates</h1>
+            <p className="text-gray-600 mt-1">Tạo và quản lý các template CV cho người dùng</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={fetchTemplates}
+              disabled={loading}
+              className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Tải lại"
+            >
+              <LuRefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={handleCreateNew}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <LuPlus className="w-5 h-5" />
+              Tạo Template Mới
+            </button>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <button
-            onClick={fetchTemplates}
-            disabled={loading}
-            className="p-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Tải lại"
-          >
-            <LuRefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-          <button
-            onClick={handleCreateNew}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <LuPlus className="w-5 h-5" />
-            Tạo Template Mới
-          </button>
-        </div>
+
+        {/* Filters */}
+        {templates.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <LuFilter className="w-5 h-5 text-gray-600" />
+              <h2 className="text-lg font-semibold text-gray-900">Bộ lọc</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Search */}
+              <div className="relative">
+                <LuSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Tìm kiếm theo tên, mô tả..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Publish Status Filter */}
+              <div>
+                <SelectWithSearch
+                  options={[
+                    { value: 'all', label: 'Tất cả trạng thái' },
+                    { value: 'published', label: 'Công khai' },
+                    { value: 'draft', label: 'Nháp' }
+                  ]}
+                  selectedValues={[publishFilter]}
+                  onChange={(values) => setPublishFilter(values[0] || 'all')}
+                  placeholder="Chọn trạng thái"
+                  multiple={false}
+                  clearable={false}
+                />
+              </div>
+            </div>
+
+            {/* Filter Summary */}
+            {(searchTerm || publishFilter !== 'all') && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+                <span>Hiển thị {filteredTemplates.length} / {templates.length} templates</span>
+                {(searchTerm || publishFilter !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setSearchTerm('');
+                      setPublishFilter('all');
+                    }}
+                    className="text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Xóa bộ lọc
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Templates Grid */}
@@ -482,6 +570,20 @@ const AdminCVTemplateManagement: React.FC = () => {
         <div className="text-center py-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <p className="text-gray-600 mt-2">Đang tải...</p>
+        </div>
+      ) : filteredTemplates.length === 0 && templates.length > 0 ? (
+        <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
+          <LuImage className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-600">Không tìm thấy template phù hợp</p>
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setPublishFilter('all');
+            }}
+            className="mt-4 text-blue-600 hover:text-blue-700 font-medium"
+          >
+            Xóa bộ lọc
+          </button>
         </div>
       ) : templates.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
@@ -496,7 +598,7 @@ const AdminCVTemplateManagement: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {templates.map((template) => (
+          {filteredTemplates.map((template) => (
             <div
               key={template.id}
               className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col"
@@ -546,6 +648,21 @@ const AdminCVTemplateManagement: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setTemplateToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Xác nhận xóa"
+        message="Bạn có chắc chắn muốn xóa template này? Hành động này không thể hoàn tác."
+        confirmText="Xóa"
+        cancelText="Hủy"
+        type="danger"
+      />
     </>
   );
 };

@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { getUserLikedJobs, unlikeJob, type Job } from '../../api/jobService';
 import { toast } from 'react-toastify';
 import { formatDate } from '../../utils/dateUtils';
-import { LuHeart, LuBriefcase, LuMapPin, LuCalendar, LuDollarSign, LuLoader, LuHeartOff } from 'react-icons/lu';
+import { LuHeart, LuBriefcase, LuMapPin, LuCalendar, LuDollarSign, LuLoader, LuHeartOff, LuSearch, LuFilter } from 'react-icons/lu';
 import { usePagination } from '../../hooks/usePagination';
+import SelectWithSearch from '../../components/common/SelectWithSearch';
 
 // Memoized JobCard component to prevent unnecessary re-renders
 const JobCard = React.memo(({ 
@@ -87,6 +88,9 @@ const LikedJobs: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const { currentPage, setCurrentPage, pagination, setPagination } = usePagination(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [locationFilter, setLocationFilter] = useState<string>('all');
+  const [salaryFilter, setSalaryFilter] = useState<string>('all');
 
   const fetchLikedJobs = useCallback(async (page: number = 1) => {
     try {
@@ -121,6 +125,43 @@ const LikedJobs: React.FC = () => {
     const encodedJobId = btoa(jobId.toString());
     navigate(`/viec-lam/${encodedJobId}`);
   }, [navigate]);
+
+  // Filter jobs based on search, location, and salary
+  const filteredJobs = React.useMemo(() => {
+    return jobs.filter(job => {
+      const matchesSearch = searchTerm === '' ||
+        job.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job.location?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesLocation = locationFilter === 'all' || 
+        job.location?.toLowerCase().includes(locationFilter.toLowerCase());
+      
+      const matchesSalary = salaryFilter === 'all' || (() => {
+        if (!job.salary) return false;
+        const salaryLower = job.salary.toLowerCase();
+        switch(salaryFilter) {
+          case 'under10': return salaryLower.includes('triệu') && !salaryLower.includes('10');
+          case '10-20': return salaryLower.includes('10') || salaryLower.includes('15') || salaryLower.includes('20');
+          case '20-30': return salaryLower.includes('20') || salaryLower.includes('25') || salaryLower.includes('30');
+          case 'over30': return salaryLower.includes('30') || salaryLower.includes('40') || salaryLower.includes('50');
+          case 'negotiable': return salaryLower.includes('thỏa thuận') || salaryLower.includes('cạnh tranh');
+          default: return true;
+        }
+      })();
+      
+      return matchesSearch && matchesLocation && matchesSalary;
+    });
+  }, [jobs, searchTerm, locationFilter, salaryFilter]);
+
+  // Get unique locations for filter
+  const uniqueLocations = React.useMemo(() => {
+    const locations = jobs
+      .map(j => j.location)
+      .filter((loc): loc is string => !!loc)
+      .map(loc => loc.split(',')[0].trim());
+    return Array.from(new Set(locations)).sort();
+  }, [jobs]);
 
 
   if (loading) {
@@ -166,7 +207,96 @@ const LikedJobs: React.FC = () => {
         </div>
       </div>
 
-      {jobs.length === 0 ? (
+      {/* Filters */}
+      {jobs.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <LuFilter className="w-5 h-5 text-gray-600" />
+            <h2 className="text-lg font-semibold text-gray-900">Bộ lọc</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Search */}
+            <div className="relative">
+              <LuSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm kiếm theo tên công việc, công ty..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Location Filter */}
+            <div>
+              <SelectWithSearch
+                options={[
+                  { value: 'all', label: 'Tất cả địa điểm' },
+                  ...uniqueLocations.map(location => ({
+                    value: location,
+                    label: location
+                  }))
+                ]}
+                selectedValues={[locationFilter]}
+                onChange={(values) => setLocationFilter(values[0] || 'all')}
+                placeholder="Chọn địa điểm"
+                multiple={false}
+                clearable={false}
+              />
+            </div>
+
+            {/* Salary Filter */}
+            <div>
+              <SelectWithSearch
+                options={[
+                  { value: 'all', label: 'Tất cả mức lương' },
+                  { value: 'under10', label: 'Dưới 10 triệu' },
+                  { value: '10-20', label: '10-20 triệu' },
+                  { value: '20-30', label: '20-30 triệu' },
+                  { value: 'over30', label: 'Trên 30 triệu' },
+                  { value: 'negotiable', label: 'Thỏa thuận' }
+                ]}
+                selectedValues={[salaryFilter]}
+                onChange={(values) => setSalaryFilter(values[0] || 'all')}
+                placeholder="Chọn mức lương"
+                multiple={false}
+                clearable={false}
+              />
+            </div>
+          </div>
+
+          {/* Filter Summary */}
+          {(searchTerm || locationFilter !== 'all' || salaryFilter !== 'all') && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+              <span>Hiển thị {filteredJobs.length} / {jobs.length} công việc</span>
+              {(searchTerm || locationFilter !== 'all' || salaryFilter !== 'all') && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setLocationFilter('all');
+                    setSalaryFilter('all');
+                  }}
+                  className="text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  Xóa bộ lọc
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {filteredJobs.length === 0 && jobs.length > 0 ? (
+        <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+          <LuHeartOff className="mx-auto h-16 w-16 text-gray-400" />
+          <h3 className="mt-4 text-lg font-medium text-gray-900">
+            Không tìm thấy công việc phù hợp
+          </h3>
+          <p className="mt-2 text-sm text-gray-500">
+            Thử thay đổi bộ lọc để tìm kiếm công việc khác
+          </p>
+        </div>
+      ) : jobs.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center">
           <LuHeartOff className="mx-auto h-16 w-16 text-gray-400" />
           <h3 className="mt-4 text-lg font-medium text-gray-900">
@@ -185,7 +315,7 @@ const LikedJobs: React.FC = () => {
       ) : (
         <>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {jobs.map((job) => (
+            {filteredJobs.map((job) => (
               <JobCard
                 key={job.id}
                 job={job}

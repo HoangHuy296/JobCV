@@ -183,11 +183,19 @@ const TemplateSelectionModal: React.FC<TemplateSelectionModalProps> = ({ isOpen,
         });
         toast.success('Cập nhật CV thành công!');
       } else {
-        // Create new CV
+        // Create new CV - include sections info for backend
+        const sectionsInfo = templateSections.map(ts => ({
+          section_id: ts.section.id,
+          position: ts.position,
+          is_visible: ts.is_visible,
+          display_order: ts.display_order
+        }));
+
         await createCVFromTemplate({
           template_id: editingTemplate.id,
           title: cvTitle,
-          data: userData
+          data: userData,
+          sections: sectionsInfo
         });
         toast.success('Tạo CV thành công!');
       }

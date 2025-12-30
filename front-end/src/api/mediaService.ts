@@ -1,5 +1,12 @@
 import apiClient from './index';
 
+export interface MediaEntity {
+  entity_type: 'user' | 'company';
+  entity_id: number;
+  entity_name: string;
+  entity_email?: string;
+}
+
 export interface Media {
   id: number;
   filename: string;
@@ -12,6 +19,7 @@ export interface Media {
   created_at: string;
   modified_at: string;
   deleted_at: string | null;
+  used_by?: MediaEntity[];
 }
 
 export interface MediaListResponse {

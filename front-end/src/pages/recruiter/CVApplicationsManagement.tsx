@@ -54,7 +54,9 @@ const CVApplicationsManagement: React.FC = () => {
   }, [searchTerm, jobs]);
 
   const handleJobClick = (jobId: number) => {
-    navigate(`/nha-tuyen-dung/quan-ly-tin-tuyen-dung/${jobId}/ung-vien`);
+    navigate(`/nha-tuyen-dung/quan-ly-tin-tuyen-dung/${jobId}/ung-vien`, {
+      state: { from: '/nha-tuyen-dung/quan-ly-cv-ung-tuyen' }
+    });
   };
 
   const getStatusBadge = (job: Job) => {

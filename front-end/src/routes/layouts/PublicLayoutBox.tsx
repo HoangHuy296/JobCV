@@ -5,6 +5,7 @@ import { useUser } from '../../contexts/UserContext';
 import NotificationBell from '../../components/common/NotificationBell';
 import SlideOver from '../../components/common/SlideOver';
 import { userService } from '../../api/userService';
+import { uploadMedia, createMediaFromUrl } from '../../api/mediaService';
 import { toast } from 'react-toastify';
 
 interface NavItem {
@@ -16,7 +17,7 @@ interface NavItem {
 const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useUser();
+  const { user, logout, setUser } = useUser();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
@@ -96,9 +97,23 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
 
   // Handle logout
   const handleLogout = () => {
+    const userRole = user?.role;
     logout();
     toast.success('Đăng xuất thành công');
-    navigate('/');
+    
+    // Use window.location.href to force page reload and avoid RoleProtectedRoute redirect
+    switch (userRole) {
+      case 'admin':
+        window.location.href = '/admin/dang-nhap';
+        break;
+      case 'recruiter':
+        window.location.href = '/dang-nhap-nha-tuyen-dung';
+        break;
+      case 'user':
+      default:
+        window.location.href = '/dang-nhap';
+        break;
+    }
   };
 
   // Navigation items grouped by category - memoized
@@ -130,6 +145,7 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
             { name: 'Quản lý công ty', path: '/nha-tuyen-dung/quan-ly-cong-ty', category: 'business' },
             { name: 'Quản lý tin tuyển dụng', path: '/nha-tuyen-dung/quan-ly-tin-tuyen-dung', category: 'business' },
             { name: 'Quản lý CV ứng tuyển', path: '/nha-tuyen-dung/quan-ly-cv-ung-tuyen', category: 'business' },
+            { name: 'Tìm kiếm ứng viên', path: '/nha-tuyen-dung/tim-kiem-ung-vien', category: 'business' },
             // { name: 'Quản lý chiến dịch', path: '/nha-tuyen-dung/quan-ly-chien-dich', category: 'business' },
           ];
           break;
@@ -178,6 +194,11 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
   // Profile form fields
   const profileFields = [
     {
+      name: 'avatar',
+      label: 'Ảnh đại diện',
+      type: 'image' as const
+    },
+    {
       name: 'name',
       label: 'Họ và tên',
       type: 'text' as const,
@@ -214,7 +235,7 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
   // Handle profile update
   const handleProfileUpdate = async (values: Record<string, any>) => {
     setIsProfileSubmitting(true);
-    const { newPassword, confirmPassword, ...profileData } = values;
+    const { newPassword, confirmPassword, avatar, ...profileData } = values;
     
     if (newPassword || confirmPassword) {
       if (!newPassword) {
@@ -233,9 +254,43 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
     }
     
     try {
+      // Handle avatar upload
+      if (avatar instanceof File) {
+        try {
+          const mediaResponse = await uploadMedia(avatar);
+          profileData.image_id = mediaResponse.id;
+        } catch (uploadError) {
+          console.error('Error uploading avatar:', uploadError);
+          toast.error('Có lỗi xảy ra khi tải lên ảnh đại diện');
+          setIsProfileSubmitting(false);
+          return;
+        }
+      } else if (avatar && typeof avatar === 'string' && avatar !== user?.image?.url) {
+        // Create media from URL if URL is different from current avatar
+        try {
+          const mediaResponse = await createMediaFromUrl(avatar);
+          profileData.image_id = mediaResponse.id;
+        } catch (urlError) {
+          console.error('Error creating media from URL:', urlError);
+          toast.error('Có lỗi xảy ra khi tạo media từ URL');
+          setIsProfileSubmitting(false);
+          return;
+        }
+      }
+      
       if (user) {
         const resp = await userService.updateUser(user.id, profileData);
         if (resp) {
+          // Update user context with new data including image
+          // Transform the response to match UserContext type
+          setUser({
+            id: resp.id,
+            email: resp.email,
+            name: resp.name,
+            role: resp.role?.name || user.role,
+            image: resp.image,
+            is_active: resp.is_active
+          });
           toast.success('Cập nhật hồ sơ thành công');
         }
       }      
@@ -383,9 +438,17 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
                       onClick={() => setIsProfileDropdownOpen(prev => !prev)}
                       className="cursor-pointer flex items-center text-sm"
                     >
-                      <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
-                        {user?.name?.charAt(0).toUpperCase() || 'U'}
-                      </div>
+                      {user?.image?.url ? (
+                        <img 
+                          src={user.image.url} 
+                          alt={user.name} 
+                          className="w-8 h-8 rounded-full object-cover border border-gray-200"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-medium">
+                          {user?.name?.charAt(0).toUpperCase() || 'U'}
+                        </div>
+                      )}
                       <span className="ml-2 text-sm font-medium text-gray-700">
                         {user?.name}
                       </span>
@@ -407,7 +470,7 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
                               Quản lý công ty
                             </button>
                             <button
-                              onClick={() => handleProfileNavigation('/nha-tuyen-dung/quan-ly-cong-viec')}
+                              onClick={() => handleProfileNavigation('/nha-tuyen-dung/quan-ly-tin-tuyen-dung')}
                               className="block w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 cursor-pointer transition-all duration-200"
                               role="menuitem"
                             >
@@ -721,6 +784,7 @@ const PublicLayoutBox: React.FC<PropsWithChildren> = ({ children }) => {
           onSubmit={handleProfileUpdate}
           fields={profileFields}
           initialValues={{
+            avatar: user?.image?.url || '',
             name: user?.name || '',
             email: user?.email || ''
           }}

@@ -43,4 +43,10 @@ export const authService = {
     const response = await apiClient.post('/auth/resend-verification', { email });
     return response.data;
   },
+
+  // Get current user info with latest data from database
+  getMe: async () => {
+    const response = await apiClient.get('/auth/me');
+    return response.data.result;
+  },
 };
