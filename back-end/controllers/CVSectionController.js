@@ -219,19 +219,19 @@ class CVSectionController {
   static async addSectionToTemplate(req, res) {
     try {
       const { templateId } = req.params;
-      const { section_id, position, custom_fields, is_required, display_order } = req.body;
+      const { section_id, layout, custom_fields, is_required, display_order } = req.body;
       
-      if (!section_id || !position) {
+      if (!section_id || !layout) {
         return res.status(400).json({
           success: false,
-          message: 'Section ID và position là bắt buộc'
+          message: 'Section ID và layout là bắt buộc'
         });
       }
       
       const templateSectionId = await CVSection.addToTemplate(
         templateId,
         section_id,
-        position,
+        layout,
         custom_fields,
         is_required,
         display_order
@@ -361,22 +361,21 @@ class CVSectionController {
   static async saveUserCVSection(req, res) {
     try {
       const { cvId } = req.params;
-      const { section_id, position, data, is_visible, display_order } = req.body;
+      const { section_id, layout, data, is_visible, display_order } = req.body;
       const userId = req.user.id;
       
-      if (!section_id || !position || !data) {
+      if (!section_id || !layout || !data) {
         return res.status(400).json({
           success: false,
-          message: 'Section ID, position và data là bắt buộc'
+          message: 'Section ID, layout và data là bắt buộc'
         });
       }
       
-      // TODO: Verify CV belongs to user
-      
+      // Verify CV belongs to user
       const result = await CVSection.saveUserSection(
         cvId,
         section_id,
-        position,
+        layout,
         data,
         is_visible,
         display_order

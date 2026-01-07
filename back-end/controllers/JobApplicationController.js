@@ -2,6 +2,7 @@ const JobApplication = require('../models/JobApplication');
 const Notification = require('../models/Notification');
 const db = require('../config/db');
 const { sendApplicationConfirmationEmail, sendNewApplicationEmail, sendThresholdReachedEmail } = require('../config/nodemailer');
+const aiProcessService = require('../utils/aiProcessService');
 
 // Apply for a job
 const applyForJob = async (req, res) => {
@@ -628,6 +629,212 @@ const checkApplicationStatus = async (req, res) => {
   }
 };
 
+// AI-powered: Analyze job-CV match for an application
+const analyzeApplicationMatch = async (req, res) => {
+  try {
+    const applicationId = req.params.id;
+    const userId = req.user.id;
+
+    // Get application with job and CV data
+    const [applications] = await db.query(
+      `SELECT 
+        ja.*,
+        j.title as job_title, j.requirement, j.benefits, j.years_experienced, j.location,
+        i.name as industry_name,
+        c.extracted_info as cv_data
+       FROM job_applications ja
+       JOIN jobs j ON ja.job_id = j.id
+       LEFT JOIN industries i ON j.industry_id = i.id
+       LEFT JOIN cvs c ON ja.cv_id = c.id
+       WHERE ja.id = ? AND ja.deleted_at IS NULL`,
+      [applicationId]
+    );
+
+    if (applications.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Application not found'
+      });
+    }
+
+    const application = applications[0];
+
+    // Check permission
+    if (application.user_id !== userId && req.user.role?.name !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Check if AI process is available
+    const isAvailable = await aiProcessService.isProcessAvailable('JOB_CV_SCORE');
+    if (!isAvailable) {
+      return res.status(503).json({
+        success: false,
+        message: 'AI matching analyzer is not available'
+      });
+    }
+
+    // Execute AI process
+    const result = await aiProcessService.executeProcess(
+      'JOB_CV_SCORE',
+      {
+        job_title: application.job_title,
+        job_requirements: application.requirement || '',
+        job_benefits: application.benefits || '',
+        years_experienced: application.years_experienced?.toString() || '0',
+        industry: application.industry_name || '',
+        location: application.location || '',
+        cv_data: JSON.stringify(application.cv_data || {})
+      }
+    );
+
+    if (result.success) {
+      res.json({
+        success: true,
+        data: result.data
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: result.error || 'Failed to analyze match'
+      });
+    }
+  } catch (error) {
+    console.error('Error analyzing application match:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// AI-powered: Rank all applications for a job
+const rankJobApplications = async (req, res) => {
+  try {
+    const jobId = req.params.jobId;
+
+    // Check if user has permission (admin or job owner)
+    const [jobs] = await db.query(
+      'SELECT created_by FROM jobs WHERE id = ? AND deleted_at IS NULL',
+      [jobId]
+    );
+
+    if (jobs.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Job not found'
+      });
+    }
+
+    const isAdmin = req.user.role?.name === 'admin';
+    const isJobOwner = jobs[0].created_by === req.user.id;
+
+    if (!isAdmin && !isJobOwner) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Get job details
+    const [jobDetails] = await db.query(
+      `SELECT j.*, i.name as industry_name, c.name as company_name
+       FROM jobs j
+       LEFT JOIN industries i ON j.industry_id = i.id
+       LEFT JOIN companies c ON j.company_id = c.id
+       WHERE j.id = ?`,
+      [jobId]
+    );
+
+    // Get all applications with CV data
+    const [applications] = await db.query(
+      `SELECT 
+        ja.id, ja.user_id, ja.status, ja.created_at,
+        u.name as candidate_name, u.email as candidate_email,
+        c.extracted_info as cv_data
+       FROM job_applications ja
+       JOIN users u ON ja.user_id = u.id
+       LEFT JOIN cvs c ON ja.cv_id = c.id
+       WHERE ja.job_id = ? AND ja.deleted_at IS NULL
+       ORDER BY ja.created_at DESC`,
+      [jobId]
+    );
+
+    if (applications.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          ranked_applications: [],
+          summary: {
+            total_applications: 0,
+            strong_candidates: 0,
+            potential_candidates: 0,
+            not_recommended: 0
+          }
+        }
+      });
+    }
+
+    // Check if AI process is available
+    const isAvailable = await aiProcessService.isProcessAvailable('APP_RANKING');
+    if (!isAvailable) {
+      return res.status(503).json({
+        success: false,
+        message: 'AI application ranking is not available'
+      });
+    }
+
+    // Prepare data for AI
+    const jobInfo = JSON.stringify({
+      title: jobDetails[0].title,
+      requirement: jobDetails[0].requirement,
+      benefits: jobDetails[0].benefits,
+      years_experienced: jobDetails[0].years_experienced,
+      industry: jobDetails[0].industry_name,
+      location: jobDetails[0].location,
+      company: jobDetails[0].company_name
+    });
+
+    const applicationsData = JSON.stringify(
+      applications.map(app => ({
+        application_id: app.id,
+        candidate_name: app.candidate_name,
+        cv_data: app.cv_data,
+        applied_at: app.created_at
+      }))
+    );
+
+    // Execute AI process
+    const result = await aiProcessService.executeProcess(
+      'APP_RANKING',
+      {
+        job_info: jobInfo,
+        applications_data: applicationsData
+      }
+    );
+
+    if (result.success) {
+      res.json({
+        success: true,
+        data: result.data
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: result.error || 'Failed to rank applications'
+      });
+    }
+  } catch (error) {
+    console.error('Error ranking applications:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   applyForJob,
   getMyApplications,
@@ -637,5 +844,7 @@ module.exports = {
   withdrawApplication,
   getJobApplicationStats,
   updateApplicationCV,
-  checkApplicationStatus
+  checkApplicationStatus,
+  analyzeApplicationMatch,
+  rankJobApplications
 };

@@ -15,14 +15,31 @@ function generateCVPDF(cv, sections) {
       bottom: 50,
       left: 50,
       right: 50
-    }
+    },
+    bufferPages: true,
+    autoFirstPage: true,
+    compress: false
   });
 
-  // Title
+  // Use built-in fonts that support Vietnamese better
+  // Courier has better Unicode support than Helvetica
+  const regularFont = 'Courier';
+  const boldFont = 'Courier-Bold';
+
+  // Add page background color
+  doc.rect(0, 0, doc.page.width, doc.page.height)
+     .fill('#ffffff');
+
+  // Title with background
+  const titleY = 50;
+  doc.rect(0, titleY - 10, doc.page.width, 60)
+     .fill('#f8fafc');
+  
   doc.fontSize(24)
-     .font('Helvetica-Bold')
-     .text(cv.title, { align: 'center' })
-     .moveDown(1);
+     .font(boldFont)
+     .fillColor('#1e293b')
+     .text(cv.title || 'CV', 50, titleY, { align: 'center' })
+     .moveDown(2);
 
   // Add sections
   if (sections && sections.length > 0) {
@@ -34,17 +51,21 @@ function generateCVPDF(cv, sections) {
       
       if (!hasData) return;
 
-      // Section header
+      // Section header with background
+      const currentY = doc.y;
+      doc.rect(40, currentY - 5, doc.page.width - 80, 30)
+         .fill('#eff6ff');
+      
       doc.fontSize(16)
-         .font('Helvetica-Bold')
+         .font(boldFont)
          .fillColor('#2563eb')
-         .text(sectionData.section_name || `Section ${index + 1}`, { underline: true })
-         .moveDown(0.5);
+         .text(sectionData.section_name || `Section ${index + 1}`, 50, currentY, { underline: false })
+         .moveDown(0.8);
 
       // Section content
       doc.fontSize(11)
-         .font('Helvetica')
-         .fillColor('#000000');
+         .font(regularFont)
+         .fillColor('#374151');
 
       // Process each field in the section
       Object.entries(data).forEach(([fieldId, value]) => {

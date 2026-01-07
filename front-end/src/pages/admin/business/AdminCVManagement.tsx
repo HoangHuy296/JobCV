@@ -48,19 +48,17 @@ const AdminCVManagement: React.FC = () => {
 
   // Memoized pagination data
   const paginationData = useMemo(() => {
-    return pagination.totalPages > 1
-      ? {
-          currentPage,
-          totalPages: pagination.totalPages,
-          totalItems: pagination.total,
-          itemsPerPage: pagination.limit,
-          onPageChange: fetchCVs,
-          onItemsPerPageChange: (newLimit: number) => {
-            setPagination(prev => ({ ...prev, limit: newLimit }));
-            fetchCVs(1, false, newLimit);
-          }
-        }
-      : undefined;
+    return {
+      currentPage,
+      totalPages: pagination.totalPages,
+      totalItems: pagination.total,
+      itemsPerPage: pagination.limit,
+      onPageChange: fetchCVs,
+      onItemsPerPageChange: (newLimit: number) => {
+        setPagination(prev => ({ ...prev, limit: newLimit }));
+        fetchCVs(1, false, newLimit);
+      }
+    };
   }, [currentPage, pagination, fetchCVs]);
 
   // Load CVs on component mount

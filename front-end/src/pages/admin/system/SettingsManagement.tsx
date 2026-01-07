@@ -51,19 +51,17 @@ const SettingsManagement: React.FC = () => {
 
   // Memoized pagination data
   const paginationData = useMemo(() => {
-    return pagination.totalPages > 1
-      ? {
-          currentPage,
-          totalPages: pagination.totalPages,
-          totalItems: pagination.total,
-          itemsPerPage: pagination.limit,
-          onPageChange: fetchData,
-          onItemsPerPageChange: (newLimit: number) => {
-            setPagination(prev => ({ ...prev, limit: newLimit }));
-            fetchData(1, false, newLimit);
-          }
-        }
-      : undefined;
+    return {
+      currentPage,
+      totalPages: pagination.totalPages,
+      totalItems: pagination.total,
+      itemsPerPage: pagination.limit,
+      onPageChange: fetchData,
+      onItemsPerPageChange: (newLimit: number) => {
+        setPagination(prev => ({ ...prev, limit: newLimit }));
+        fetchData(1, false, newLimit);
+      }
+    };
   }, [currentPage, pagination, fetchData]);
 
   // Load data on component mount

@@ -41,8 +41,8 @@ class Company {
     
     // Add filtering conditions
     if (filters.search) {
-      query += ' AND (c.name LIKE ? OR c.description LIKE ?)';
-      values.push(`%${filters.search}%`, `%${filters.search}%`);
+      query += ' AND (c.name LIKE ?)';
+      values.push(`%${filters.search}%`);
     }
     
     if (filters.industry) {

@@ -30,6 +30,7 @@ export type FormField = {
   defaultValue?: any;
   multiple?: boolean;
   description?: string;
+  rows?: number;
   render?: (value: any, onChange: (value: any) => void) => React.ReactNode;
 };
 
@@ -259,7 +260,7 @@ const SlideOver: React.FC<SlideOverProps> = ({
                                 value={formData[field.name]}
                                 onChange={handleChange}
                                 placeholder={field.placeholder}
-                                rows={3}
+                                rows={field.rows || 3}
                                 className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors[field.name] ? 'border-red-500' : 'border-gray-300'}`}
                               />
                               {field.description && (

@@ -68,22 +68,31 @@ INSERT INTO cv_sections (name, key_name, description, icon, default_fields, cate
 ('Sơ bộ bản thân', 'personal_info', 'Thông tin cá nhân cơ bản: tên, email, số điện thoại, địa chỉ', 'LuUser', 
   JSON_OBJECT(
     'fields', JSON_ARRAY(
+      JSON_OBJECT('id', 'avatar', 'type', 'image', 'label', 'Ảnh đại diện', 'required', false),
       JSON_OBJECT('id', 'full_name', 'type', 'text', 'label', 'Họ và tên', 'placeholder', 'Nguyễn Văn A', 'required', true),
-      JSON_OBJECT('id', 'email', 'type', 'text', 'label', 'Email', 'placeholder', 'example@email.com', 'required', true),
-      JSON_OBJECT('id', 'phone', 'type', 'text', 'label', 'Số điện thoại', 'placeholder', '0123456789', 'required', true),
+      JSON_OBJECT('id', 'email', 'type', 'email', 'label', 'Email', 'placeholder', 'example@email.com', 'required', true),
+      JSON_OBJECT('id', 'phone', 'type', 'tel', 'label', 'Số điện thoại', 'placeholder', '0123456789', 'required', true),
       JSON_OBJECT('id', 'address', 'type', 'text', 'label', 'Địa chỉ', 'placeholder', 'Hà Nội, Việt Nam', 'required', false),
-      JSON_OBJECT('id', 'avatar', 'type', 'image', 'label', 'Ảnh đại diện', 'required', false)
+      JSON_OBJECT('id', 'goal', 'type', 'text', 'label', 'Mục tiêu nghề nghiệp', 'required', false)
     )
   ),
   'basic', 1),
 
-('Mục tiêu nghề nghiệp', 'career_objective', 'Mục tiêu và định hướng nghề nghiệp', 'LuTarget',
+('Sở thích', 'hobbies', 'Sở thích cá nhân', 'LuHeart',
   JSON_OBJECT(
     'fields', JSON_ARRAY(
-      JSON_OBJECT('id', 'objective', 'type', 'richtext', 'label', 'Mục tiêu nghề nghiệp', 'placeholder', 'Mô tả mục tiêu nghề nghiệp của bạn...', 'required', false)
+      JSON_OBJECT('id', 'hobbies_info', 'type', 'richtext', 'label', 'Sở thích', 'placeholder', 'Đọc sách, du lịch...', 'required', false)
     )
   ),
-  'basic', 2),
+  'additional', 2),
+
+('Học vấn', 'education', 'Trình độ học vấn và bằng cấp', 'LuGraduationCap',
+  JSON_OBJECT(
+    'fields', JSON_ARRAY(
+      JSON_OBJECT('id', 'education_info', 'type', 'richtext', 'label', 'Học vấn', 'placeholder', 'Trường, chuyên ngành, thời gian...', 'required', false)
+    )
+  ),
+  'professional', 3),
 
 ('Kỹ năng', 'skills', 'Các kỹ năng chuyên môn và kỹ năng mềm', 'LuWrench',
   JSON_OBJECT(
@@ -92,7 +101,7 @@ INSERT INTO cv_sections (name, key_name, description, icon, default_fields, cate
       JSON_OBJECT('id', 'soft_skills', 'type', 'richtext', 'label', 'Kỹ năng mềm', 'placeholder', 'Làm việc nhóm, giao tiếp...', 'required', false)
     )
   ),
-  'professional', 3),
+  'professional', 4),
 
 ('Kinh nghiệm làm việc', 'work_experience', 'Lịch sử làm việc và kinh nghiệm', 'LuBriefcase',
   JSON_OBJECT(
@@ -100,39 +109,7 @@ INSERT INTO cv_sections (name, key_name, description, icon, default_fields, cate
       JSON_OBJECT('id', 'experiences', 'type', 'richtext', 'label', 'Kinh nghiệm làm việc', 'placeholder', 'Liệt kê các vị trí đã làm việc...', 'required', false)
     )
   ),
-  'professional', 4),
-
-('Học vấn', 'education', 'Trình độ học vấn và bằng cấp', 'LuGraduationCap',
-  JSON_OBJECT(
-    'fields', JSON_ARRAY(
-      JSON_OBJECT('id', 'education_info', 'type', 'richtext', 'label', 'Học vấn', 'placeholder', 'Trường, chuyên ngành, thời gian...', 'required', false)
-    )
-  ),
   'professional', 5),
-
-('Chứng chỉ', 'certifications', 'Các chứng chỉ và giải thưởng', 'LuAward',
-  JSON_OBJECT(
-    'fields', JSON_ARRAY(
-      JSON_OBJECT('id', 'certs', 'type', 'richtext', 'label', 'Chứng chỉ', 'placeholder', 'Liệt kê các chứng chỉ...', 'required', false)
-    )
-  ),
-  'additional', 6),
-
-('Dự án', 'projects', 'Các dự án đã thực hiện', 'LuFolderGit2',
-  JSON_OBJECT(
-    'fields', JSON_ARRAY(
-      JSON_OBJECT('id', 'projects_info', 'type', 'richtext', 'label', 'Dự án', 'placeholder', 'Mô tả các dự án...', 'required', false)
-    )
-  ),
-  'additional', 7),
-
-('Sở thích', 'hobbies', 'Sở thích cá nhân', 'LuHeart',
-  JSON_OBJECT(
-    'fields', JSON_ARRAY(
-      JSON_OBJECT('id', 'hobbies_info', 'type', 'richtext', 'label', 'Sở thích', 'placeholder', 'Đọc sách, du lịch...', 'required', false)
-    )
-  ),
-  'additional', 8),
 
 ('Người tham chiếu', 'references', 'Thông tin người tham chiếu', 'LuUsers',
   JSON_OBJECT(
@@ -140,8 +117,14 @@ INSERT INTO cv_sections (name, key_name, description, icon, default_fields, cate
       JSON_OBJECT('id', 'references_info', 'type', 'richtext', 'label', 'Người tham chiếu', 'placeholder', 'Tên, vị trí, liên hệ...', 'required', false)
     )
   ),
-  'additional', 9)
-ON DUPLICATE KEY UPDATE name=name;
+  'additional', 6)
+ON DUPLICATE KEY UPDATE 
+  name=VALUES(name),
+  description=VALUES(description),
+  icon=VALUES(icon),
+  default_fields=VALUES(default_fields),
+  category=VALUES(category),
+  display_order=VALUES(display_order);
 `;
 
 async function runMigration() {

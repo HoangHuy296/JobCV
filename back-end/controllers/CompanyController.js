@@ -2,6 +2,7 @@ const Company = require('../models/Company');
 const CompanySubscription = require('../models/CompanySubscription');
 const Notification = require('../models/Notification');
 const db = require('../config/db');
+const aiProcessService = require('../utils/aiProcessService');
 
 // Create a new company
 const createCompany = async (req, res) => {
@@ -411,6 +412,155 @@ const getUserSubscribedCompanies = async (req, res) => {
   }
 };
 
+// Get top companies based on subscription count and job likes
+const getTopCompanies = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    
+    // Query to get top companies based on:
+    // 1. Number of subscribers (primary ranking)
+    // 2. Total likes on their jobs (secondary ranking)
+    const query = `
+      SELECT 
+        c.*,
+        COALESCE(sub_count.subscriber_count, 0) as subscriber_count,
+        COALESCE(job_likes.total_likes, 0) as total_job_likes,
+        COALESCE(job_count.active_jobs, 0) as active_jobs,
+        m.id as logo_id,
+        m.filename as logo_filename,
+        m.original_name as logo_original_name,
+        m.mime_type as logo_mime_type,
+        m.size as logo_size,
+        m.path as logo_path,
+        m.url as logo_url
+      FROM companies c
+      LEFT JOIN (
+        SELECT company_id, COUNT(*) as subscriber_count
+        FROM company_subscriptions
+        GROUP BY company_id
+      ) sub_count ON c.id = sub_count.company_id
+      LEFT JOIN (
+        SELECT j.company_id, COUNT(jl.id) as total_likes
+        FROM jobs j
+        LEFT JOIN job_likes jl ON j.id = jl.job_id
+        WHERE j.status = 'approved' AND j.deleted_at IS NULL
+        GROUP BY j.company_id
+      ) job_likes ON c.id = job_likes.company_id
+      LEFT JOIN (
+        SELECT company_id, COUNT(*) as active_jobs
+        FROM jobs
+        WHERE status = 'approved' AND deleted_at IS NULL
+        GROUP BY company_id
+      ) job_count ON c.id = job_count.company_id
+      LEFT JOIN media m ON c.logo_id = m.id
+      WHERE c.deleted_at IS NULL
+      ORDER BY subscriber_count DESC, total_job_likes DESC, active_jobs DESC
+      LIMIT ?
+    `;
+    
+    const [rows] = await db.query(query, [limit]);
+    
+    // Transform rows to include logo object
+    const companies = rows.map(row => {
+      const logo = row.logo_id ? {
+        id: row.logo_id,
+        filename: row.logo_filename,
+        original_name: row.logo_original_name,
+        mime_type: row.logo_mime_type,
+        size: row.logo_size,
+        path: row.logo_path,
+        url: row.logo_url
+      } : null;
+      
+      return {
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        website: row.website,
+        location: row.location,
+        employees: row.employees,
+        industries: row.industries,
+        logo: logo,
+        facebook: row.facebook,
+        youtube: row.youtube,
+        linkedin: row.linkedin,
+        twitter: row.twitter,
+        instagram: row.instagram,
+        created_by: row.created_by,
+        created_at: row.created_at,
+        modified_at: row.modified_at,
+        deleted_at: row.deleted_at,
+        subscriber_count: row.subscriber_count,
+        total_job_likes: row.total_job_likes,
+        active_jobs: row.active_jobs
+      };
+    });
+
+    res.status(200).json({
+      result: companies,
+      message: null
+    });
+  } catch (error) {
+    console.error('Error fetching top companies:', error);
+    res.status(500).json({ result: null, message: 'Lỗi khi tải danh sách công ty hàng đầu' });
+  }
+};
+
+// AI-powered: Generate professional company description
+const generateCompanyDescription = async (req, res) => {
+  try {
+    const { name, industry, location, company_size, website, brief_info } = req.body;
+
+    // Validate required fields
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Company name is required'
+      });
+    }
+
+    // Check if AI process is available
+    const isAvailable = await aiProcessService.isProcessAvailable('COMPANY_DESC_GEN');
+    if (!isAvailable) {
+      return res.status(503).json({
+        success: false,
+        message: 'AI company description generator is not available'
+      });
+    }
+
+    // Execute AI process
+    const result = await aiProcessService.executeProcess(
+      'COMPANY_DESC_GEN',
+      {
+        company_name: name,
+        industry: industry || 'General',
+        location: location || 'Vietnam',
+        company_size: company_size || 'Unknown',
+        website: website || '',
+        brief_info: brief_info || 'A professional company'
+      }
+    );
+
+    if (result.success) {
+      res.json({
+        success: true,
+        data: result.data
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: result.error || 'Failed to generate company description'
+      });
+    }
+  } catch (error) {
+    console.error('Error generating company description:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   createCompany,
   getAllCompanies,
@@ -421,5 +571,7 @@ module.exports = {
   subscribeToCompany,
   unsubscribeFromCompany,
   checkSubscriptionStatus,
-  getUserSubscribedCompanies
+  getUserSubscribedCompanies,
+  getTopCompanies,
+  generateCompanyDescription
 };

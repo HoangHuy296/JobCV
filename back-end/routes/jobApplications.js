@@ -9,7 +9,9 @@ const {
   withdrawApplication,
   getJobApplicationStats,
   updateApplicationCV,
-  checkApplicationStatus
+  checkApplicationStatus,
+  analyzeApplicationMatch,
+  rankJobApplications
 } = require('../controllers/JobApplicationController');
 const authenticate = require('../middleware/auth');
 
@@ -268,5 +270,9 @@ router.get('/check/:jobId', authenticate, checkApplicationStatus);
  *         description: Forbidden
  */
 router.put('/:id/update-cv', authenticate, updateApplicationCV);
+
+// AI-powered routes
+router.post('/:id/ai/analyze-match', authenticate, analyzeApplicationMatch);
+router.post('/jobs/:jobId/ai/rank-applications', authenticate, rankJobApplications);
 
 module.exports = router;

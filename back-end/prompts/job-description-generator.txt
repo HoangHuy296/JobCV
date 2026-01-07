@@ -1,0 +1,44 @@
+Generate a comprehensive and professional job description based on the following information.
+
+Job Title: {{job_title}}
+Company: {{company_name}}
+Industry: {{industry}}
+Location: {{location}}
+Years of Experience Required: {{years_experienced}}
+Work Hours: {{work_hours}}
+Brief Description: {{brief_description}}
+
+Please generate a detailed job description with the following sections in JSON format:
+
+{
+  "title": "Optimized job title",
+  "brief_description": "A compelling 2-3 sentence summary that attracts candidates (HTML format)",
+  "requirement": "Detailed requirements section in HTML format with bullet points covering:
+    - Educational background
+    - Required skills and experience
+    - Technical competencies
+    - Soft skills
+    - Any certifications needed",
+  "benefits": "Attractive benefits section in HTML format with bullet points covering:
+    - Salary range and bonuses
+    - Health and insurance benefits
+    - Work-life balance perks
+    - Career development opportunities
+    - Other company benefits",
+  "responsibilities": "Clear list of day-to-day responsibilities in HTML format",
+  "suggested_salary_range": "Suggested competitive salary range for this position",
+  "keywords": ["keyword1", "keyword2", "keyword3"]
+}
+
+IMPORTANT HTML FORMATTING RULES:
+- Use ONLY these HTML tags: <p>, <ul>, <li>, <strong>, <em>
+- Use <p> for paragraphs
+- Use <ul> and <li> for bullet point lists
+- Use <strong> for bold text (important terms, headings)
+- Use <em> for italic text (emphasis)
+- Do NOT use any other HTML tags (no <h1>, <h2>, <div>, <span>, <br>, etc.)
+- Ensure all HTML is properly closed and valid
+
+Make the description professional, engaging, and optimized for attracting qualified candidates. Use Vietnamese language for all content.
+
+Return ONLY valid JSON, no additional text.

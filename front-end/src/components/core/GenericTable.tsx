@@ -22,8 +22,8 @@ interface GenericTableProps<T> {
   onEdit?: (record: T) => void;
   onDelete?: (record: T) => void;
   additionalActions?: (record: T) => Action<T>[];
-  showEditAction?: boolean;
-  showDeleteAction?: boolean;
+  showEditAction?: boolean | ((record: T) => boolean);
+  showDeleteAction?: boolean | ((record: T) => boolean);
   loading?: boolean;
 }
 
@@ -43,11 +43,13 @@ const GenericTable = <T extends { id: number }>({
     event.preventDefault();
     event.stopPropagation();
     
-    // Prepare actions for the dropdown
     const actionsList: TableAction[] = [];
     
+    // Check if edit action should be shown
+    const shouldShowEdit = typeof showEditAction === 'function' ? showEditAction(record) : showEditAction;
+    
     // Add edit action if available
-    if (showEditAction && onEdit) {
+    if (shouldShowEdit && onEdit) {
       actionsList.push({
         id: 'edit',
         label: 'Sửa',
@@ -71,8 +73,11 @@ const GenericTable = <T extends { id: number }>({
       actionsList.push(...additionalActionsList);
     }
     
+    // Check if delete action should be shown
+    const shouldShowDelete = typeof showDeleteAction === 'function' ? showDeleteAction(record) : showDeleteAction;
+    
     // Add delete action if available (always at the end)
-    if (showDeleteAction && onDelete) {
+    if (shouldShowDelete && onDelete) {
       actionsList.push({
         id: 'delete',
         label: 'Xóa',
@@ -161,10 +166,12 @@ const GenericTable = <T extends { id: number }>({
                 <td key={String(column.key)} className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {column.render
                     ? column.render(record[column.key], record)
-                    : String(record[column.key])}
+                    : typeof record[column.key] === 'object' && record[column.key] !== null
+                      ? JSON.stringify(record[column.key])
+                      : String(record[column.key] ?? '')}
                 </td>
               ))}
-              {((showEditAction && onEdit) || (showDeleteAction && onDelete) || additionalActions) && (
+              {(onEdit || onDelete || additionalActions) && (
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium sticky right-0 bg-white">
                   <button
                     onClick={(e) => handleActionsClick(e, record)}

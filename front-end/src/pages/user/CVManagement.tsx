@@ -25,6 +25,8 @@ import ConfirmModal from '../../components/common/ConfirmModal';
 import TemplateSelectionModal from '../../components/cv/TemplateSelectionModal';
 import CVPreviewModal from '../../components/cv/CVPreviewModal';
 import SelectWithSearch from '../../components/common/SelectWithSearch';
+import aiGenerationService from '../../services/aiGenerationService';
+import { getAllJobs, type Job } from '../../api/jobService';
 
 const CVManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -61,6 +63,18 @@ const CVManagement: React.FC = () => {
   const [editingCvId, setEditingCvId] = useState<number | null>(null);
   const [showCVPreviewModal, setShowCVPreviewModal] = useState(false);
   const [previewCvId, setPreviewCvId] = useState<number | null>(null);
+  
+  // AI Matching state
+  const [showMatchingModal, setShowMatchingModal] = useState(false);
+  const [selectedCvForMatching, setSelectedCvForMatching] = useState<CV | null>(null);
+  const [rankedJobs, setRankedJobs] = useState<any[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  
+  // CV Improvement state
+  const [showImprovementModal, setShowImprovementModal] = useState(false);
+  const [selectedCvForImprovement, setSelectedCvForImprovement] = useState<CV | null>(null);
+  const [improvementSuggestions, setImprovementSuggestions] = useState<string | null>(null);
+  const [isGeneratingImprovement, setIsGeneratingImprovement] = useState(false);
 
   const fetchCVs = useCallback(async (page: number = 1, search: string = '') => {
     try {
@@ -81,8 +95,45 @@ const CVManagement: React.FC = () => {
     fetchCVs(1, searchTerm);
   }, [fetchCVs, searchTerm]);
 
+
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
+  };
+
+  const handleAnalyzeMatch = async (cv: CV) => {
+    setSelectedCvForMatching(cv);
+    setShowMatchingModal(true);
+    setRankedJobs([]);
+    
+    try {
+      setIsAnalyzing(true);
+      const rankings = await aiGenerationService.rankJobsForCV(cv.id);
+      setRankedJobs(rankings);
+      toast.success('Xếp hạng công việc phù hợp thành công!');
+    } catch (error: any) {
+      toast.error(error.message || 'Không thể xếp hạng công việc');
+      setShowMatchingModal(false);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleGetImprovementSuggestions = async (cv: CV) => {
+    setSelectedCvForImprovement(cv);
+    setShowImprovementModal(true);
+    setImprovementSuggestions(null);
+    
+    try {
+      setIsGeneratingImprovement(true);
+      const suggestions = await aiGenerationService.getCVImprovementSuggestions(cv.id);
+      setImprovementSuggestions(suggestions);
+      toast.success('Tạo gợi ý cải thiện CV thành công!');
+    } catch (error: any) {
+      toast.error(error.message || 'Không thể tạo gợi ý cải thiện');
+      setShowImprovementModal(false);
+    } finally {
+      setIsGeneratingImprovement(false);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -547,6 +598,24 @@ const CVManagement: React.FC = () => {
                     <LuDownload className="w-4 h-4" />
                     Tải xuống
                   </button>
+                  <button
+                    onClick={() => handleAnalyzeMatch(cv)}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all cursor-pointer font-medium text-sm shadow-md hover:shadow-lg"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Tìm việc phù hợp
+                  </button>
+                  <button
+                    onClick={() => handleGetImprovementSuggestions(cv)}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:from-green-700 hover:to-teal-700 transition-all cursor-pointer font-medium text-sm shadow-md hover:shadow-lg"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Gợi ý cải thiện
+                  </button>
                   {cv.template_id && (
                     <button
                       onClick={() => handleEditCV(cv.id)}
@@ -595,7 +664,7 @@ const CVManagement: React.FC = () => {
 
       {/* Upload Modal */}
       {isUploadModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Tải CV lên</h2>
@@ -725,6 +794,190 @@ const CVManagement: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CV Improvement Suggestions Modal */}
+      {showImprovementModal && selectedCvForImprovement && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">Gợi ý cải thiện CV</h3>
+                  <p className="text-sm text-gray-500">{selectedCvForImprovement.title}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowImprovementModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <LuX className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {isGeneratingImprovement ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <svg className="animate-spin h-12 w-12 text-green-600 mb-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <p className="text-gray-600 font-medium">Đang phân tích CV và tạo gợi ý cải thiện...</p>
+                  <p className="text-sm text-gray-500 mt-2">Vui lòng đợi trong giây lát</p>
+                </div>
+              ) : improvementSuggestions ? (
+                <div className="space-y-4">
+                  <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-lg p-6 border border-green-200">
+                    <pre className="whitespace-pre-wrap text-gray-800 font-sans text-sm leading-relaxed">
+                      {improvementSuggestions}
+                    </pre>
+                  </div>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      💡 <strong>Gợi ý:</strong> Áp dụng những gợi ý này để cải thiện CV của bạn và tăng cơ hội được tuyển dụng. Hãy chỉnh sửa CV và tải lên phiên bản mới!
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => {
+                  setShowImprovementModal(false);
+                  setImprovementSuggestions(null);
+                }}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Matching Modal */}
+      {showMatchingModal && selectedCvForMatching && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">Tìm việc phù hợp với CV</h3>
+                  <p className="text-sm text-gray-500">{selectedCvForMatching.title}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowMatchingModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <LuX className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {isAnalyzing ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <svg className="animate-spin h-12 w-12 text-purple-600 mb-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <p className="text-gray-600 font-medium">Đang phân tích và xếp hạng công việc phù hợp...</p>
+                  <p className="text-sm text-gray-500 mt-2">Vui lòng đợi trong giây lát</p>
+                </div>
+              ) : rankedJobs.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg">
+                    <p className="text-sm text-purple-800">
+                      🎯 <strong>Tìm thấy {rankedJobs.length} công việc phù hợp</strong> - Được xếp hạng theo độ phù hợp với CV của bạn
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {rankedJobs.map((job, index) => {
+                      const scoreColor = job.score >= 80 ? 'text-green-600' : job.score >= 60 ? 'text-yellow-600' : 'text-red-600';
+                      const scoreBg = job.score >= 80 ? 'bg-green-100' : job.score >= 60 ? 'bg-yellow-100' : 'bg-red-100';
+                      
+                      return (
+                        <div key={job.job_id || index} className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <span className="text-lg font-bold text-gray-400">#{index + 1}</span>
+                                <h4 className="text-lg font-semibold text-gray-900">{job.job_title}</h4>
+                              </div>
+                              <p className="text-sm text-gray-600">{job.company_name}</p>
+                            </div>
+                            <div className={`flex flex-col items-center px-4 py-2 ${scoreBg} rounded-lg`}>
+                              <span className={`text-2xl font-bold ${scoreColor}`}>{job.score}</span>
+                              <span className="text-xs text-gray-600">điểm</span>
+                            </div>
+                          </div>
+                          
+                          {job.reason && (
+                            <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                              <p className="text-xs font-semibold text-gray-700 mb-1">📝 Lý do:</p>
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.reason}</p>
+                            </div>
+                          )}
+                          
+                          <div className="mt-3 flex items-center gap-2">
+                            <button
+                              onClick={() => navigate(`/viec-lam/${job.job_id}`)}
+                              className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              Xem chi tiết
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      💡 <strong>Gợi ý:</strong> Tập trung vào các công việc có điểm cao để tăng cơ hội được tuyển dụng. Bạn có thể cải thiện CV dựa trên lý do phân tích.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    ⚠️ Không tìm thấy công việc phù hợp.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => {
+                  setShowMatchingModal(false);
+                  setRankedJobs([]);
+                }}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

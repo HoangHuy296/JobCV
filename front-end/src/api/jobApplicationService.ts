@@ -25,6 +25,8 @@ export interface JobApplication {
   company_logo_id?: number | null;
   cv_title?: string;
   cv_file_path?: string;
+  cv_deleted?: boolean;
+  cv_deleted_at?: string | null;
 }
 
 export interface ApplicationStats {

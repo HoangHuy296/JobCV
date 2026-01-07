@@ -1,0 +1,46 @@
+Rank and analyze multiple job applications for a position.
+
+Job Information:
+{{job_info}}
+
+Applications Data:
+{{applications_data}}
+
+Analyze all applications and provide a comprehensive ranking with detailed reasoning.
+
+Return a JSON object with:
+
+{
+  "ranked_applications": [
+    {
+      "application_id": 123,
+      "candidate_name": "Name",
+      "rank": 1,
+      "overall_score": 92,
+      "match_score": 90,
+      "experience_score": 95,
+      "skills_score": 88,
+      "education_score": 90,
+      "key_strengths": ["Strength 1", "Strength 2"],
+      "concerns": ["Concern 1"],
+      "recommendation": "Strong hire - Schedule interview immediately",
+      "interview_priority": "high|medium|low"
+    }
+  ],
+  "summary": {
+    "total_applications": 10,
+    "strong_candidates": 3,
+    "potential_candidates": 4,
+    "not_recommended": 3
+  },
+  "hiring_recommendations": [
+    "Overall recommendation 1",
+    "Overall recommendation 2"
+  ],
+  "next_steps": [
+    "Action step 1",
+    "Action step 2"
+  ]
+}
+
+Be objective and fair in your analysis. Rank candidates from best to least suitable. Return ONLY valid JSON, no additional text.

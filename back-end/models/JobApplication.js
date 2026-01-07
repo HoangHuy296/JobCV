@@ -70,7 +70,9 @@ class JobApplication {
           u.image_id as user_image_id,
           m.url as user_image_url,
           cv.title as cv_title,
-          cv.file_path as cv_file_path
+          cv.file_path as cv_file_path,
+          cv.deleted as cv_deleted,
+          cv.deleted_at as cv_deleted_at
         FROM job_applications ja
         LEFT JOIN users u ON ja.user_id = u.id
         LEFT JOIN cvs cv ON ja.cv_id = cv.id

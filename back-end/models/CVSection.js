@@ -177,15 +177,15 @@ class CVSection {
   }
   
   // Thêm section vào template
-  static async addToTemplate(templateId, sectionId, position, customFields = null, isRequired = false, displayOrder = 0) {
+  static async addToTemplate(templateId, sectionId, layout, customFields = null, isRequired = false, displayOrder = 0) {
     const [result] = await pool.query(
       `INSERT INTO cv_template_sections 
-        (template_id, section_id, position, custom_fields, is_required, display_order)
+        (template_id, section_id, layout, custom_fields, is_required, display_order)
       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         templateId,
         sectionId,
-        JSON.stringify(position),
+        JSON.stringify(layout),
         customFields ? JSON.stringify(customFields) : null,
         isRequired,
         displayOrder
@@ -200,9 +200,9 @@ class CVSection {
     const fields = [];
     const values = [];
     
-    if (updates.position !== undefined) {
-      fields.push('position = ?');
-      values.push(JSON.stringify(updates.position));
+    if (updates.layout !== undefined) {
+      fields.push('layout = ?');
+      values.push(JSON.stringify(updates.layout));
     }
     
     if (updates.custom_fields !== undefined) {
@@ -265,20 +265,20 @@ class CVSection {
   }
   
   // Lưu user section
-  static async saveUserSection(cvId, sectionId, position, data, isVisible = true, displayOrder = 0) {
+  static async saveUserSection(cvId, sectionId, layout, data, isVisible = true, displayOrder = 0) {
     const [result] = await pool.query(
       `INSERT INTO cv_user_sections 
-        (cv_id, section_id, position, data, is_visible, display_order)
+        (cv_id, section_id, layout, data, is_visible, display_order)
       VALUES (?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
-        position = VALUES(position),
+        layout = VALUES(layout),
         data = VALUES(data),
         is_visible = VALUES(is_visible),
         display_order = VALUES(display_order)`,
       [
         cvId,
         sectionId,
-        JSON.stringify(position),
+        JSON.stringify(layout),
         JSON.stringify(data),
         isVisible,
         displayOrder
@@ -293,9 +293,9 @@ class CVSection {
     const fields = [];
     const values = [];
     
-    if (updates.position !== undefined) {
-      fields.push('position = ?');
-      values.push(JSON.stringify(updates.position));
+    if (updates.layout !== undefined) {
+      fields.push('layout = ?');
+      values.push(JSON.stringify(updates.layout));
     }
     
     if (updates.data !== undefined) {

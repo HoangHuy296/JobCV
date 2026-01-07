@@ -66,8 +66,30 @@ const TemplateSelectionModal: React.FC<TemplateSelectionModalProps> = ({ isOpen,
       const response = await getCVForEdit(editingCvId!);
       const { cv, template, sections, userData } = response.data;
       
+      console.log('CV Edit Data:', { cv, template, sections, userData });
+      
+      // Transform sections to match editor format
+      const editorSections = sections.map((ts: any) => ({
+        section: {
+          id: ts.section_id || ts.section?.id,
+          name: ts.name || ts.section?.name,
+          key_name: ts.key_name || ts.section?.key_name,
+          description: ts.description || ts.section?.description,
+          icon: ts.icon || ts.section?.icon,
+          default_fields: typeof ts.default_fields === 'string' ? JSON.parse(ts.default_fields) : (ts.default_fields || ts.section?.default_fields),
+          category: ts.category || ts.section?.category,
+          is_active: true,
+          display_order: ts.display_order,
+          created_at: '',
+          modified_at: ''
+        },
+        layout: ts.layout || (typeof ts.position === 'string' ? JSON.parse(ts.position) : ts.position),
+        is_visible: ts.is_visible !== undefined ? ts.is_visible : true,
+        display_order: ts.display_order
+      }));
+      
       setEditingTemplate(template);
-      setTemplateSections(sections);
+      setTemplateSections(editorSections);
       setUserData(userData);
       setCvTitle(cv.title);
       setShowEditor(true);
@@ -138,7 +160,7 @@ const TemplateSelectionModal: React.FC<TemplateSelectionModalProps> = ({ isOpen,
           created_at: '',
           modified_at: ''
         },
-        position: typeof ts.position === 'string' ? JSON.parse(ts.position) : ts.position,
+        layout: ts.layout || (typeof ts.position === 'string' ? JSON.parse(ts.position) : ts.position),
         is_visible: true,
         display_order: ts.display_order
       }));
@@ -186,7 +208,7 @@ const TemplateSelectionModal: React.FC<TemplateSelectionModalProps> = ({ isOpen,
         // Create new CV - include sections info for backend
         const sectionsInfo = templateSections.map(ts => ({
           section_id: ts.section.id,
-          position: ts.position,
+          position: ts.layout,
           is_visible: ts.is_visible,
           display_order: ts.display_order
         }));

@@ -1,9 +1,18 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllJobs, createJob, updateJob, deleteJob, type Job, type CreateJobData } from '../../../api/jobService';
+import { getAllJobs, createJob, deleteJob, type Job, type CreateJobData } from '../../../api/jobService';
+import { updateJobVersion } from '../../../api/jobVersionService';
+import { getAllCompanies, type Company } from '../../../api/companyService';
+import { toast } from 'react-toastify';
+import { DataManagement } from '../../../components';
 import { getJobVersions, reviewJobVersion, type JobVersion } from '../../../api/jobVersionService';
 import SelectWithSearch from '../../../components/common/SelectWithSearch';
 import ReviewJobVersionModal from '../../../components/common/ReviewJobVersionModal';
+import ConfirmModal from '../../../components/common/ConfirmModal';
+import AIGenerateButton from '../../../components/common/AIGenerateButton';
+import aiGenerationService from '../../../services/aiGenerationService';
+import { useIndustryContext } from '../../../contexts/IndustryContext';
+import QuillEditor from '../../../components/common/QuillEditor';
 
 // Define JobForEdit locally since we're removing the import from JobVersionsModal
 export interface JobForEdit extends Omit<Job, 'industry_id' | 'company_id'> {
@@ -12,12 +21,6 @@ export interface JobForEdit extends Omit<Job, 'industry_id' | 'company_id'> {
   current_version_id?: number;
   version_status?: string;
 }
-
-// Using JobForEdit from types/job.ts
-import { getAllCompanies, type Company } from '../../../api/companyService';
-import { toast } from 'react-toastify';
-import { DataManagement } from '../../../components';
-// import { useIndustryContext } from '../../../contexts/IndustryContext';
 
 interface PaginationData {
   page: number;
@@ -33,8 +36,11 @@ const JobManagement: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<JobForEdit | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<JobVersion | null>(null);
   const [versions, setVersions] = useState<JobVersion[]>([]);
+  const [showUnpublishModal, setShowUnpublishModal] = useState(false);
+  const [jobToUnpublish, setJobToUnpublish] = useState<JobForEdit | null>(null);
   const [loading, setLoading] = useState(true);
-  // const { industries } = useIndustryContext();
+  const { industries } = useIndustryContext();
+  const [currentFormData, setCurrentFormData] = useState<Record<string, any>>({});
   
   // Status options for filtering
   const statusOptions = useMemo(() => [
@@ -211,7 +217,7 @@ const JobManagement: React.FC = () => {
       companyId = typeof companyId === 'string' ? parseInt(companyId) : companyId;
       
       // Update the job with the new data
-      const resp = await updateJob(updatedJob.id, {
+      const resp = await updateJobVersion(updatedJob.id, updatedJob.current_version_id!, {
         title: updatedJob.title,
         brief_description: updatedJob.brief_description,
         requirement: updatedJob.requirement,
@@ -327,6 +333,40 @@ const JobManagement: React.FC = () => {
     }
   }, [fetchJobs]);
   
+  // Function to unpublish a job (convert approved to draft)
+  const handleUnpublish = useCallback((job: JobForEdit) => {
+    setJobToUnpublish(job);
+    setShowUnpublishModal(true);
+  }, []);
+  
+  // Confirm unpublish action
+  const confirmUnpublish = useCallback(async () => {
+    if (!jobToUnpublish || !jobToUnpublish.current_version_id) return;
+    
+    try {
+      setLoading(true);
+      // Review the current version as 'rejected' to unpublish it
+      const result = await reviewJobVersion(
+        jobToUnpublish.id, 
+        jobToUnpublish.current_version_id, 
+        'rejected', 
+        'Tắt công khai bởi admin'
+      );
+      
+      if (result) {
+        toast.success('Đã tắt công khai tin tuyển dụng');
+        fetchJobs();
+        setShowUnpublishModal(false);
+        setJobToUnpublish(null);
+      }
+    } catch (error) {
+      console.error('Error unpublishing job:', error);
+      toast.error('Lỗi khi tắt công khai tin tuyển dụng');
+    } finally {
+      setLoading(false);
+    }
+  }, [jobToUnpublish, fetchJobs]);
+  
     // Status badge configuration
     const STATUS_CONFIG = useMemo(() => ({
       draft: { 
@@ -422,6 +462,21 @@ const JobManagement: React.FC = () => {
     }
   ];
 
+  // AI Generation handlers
+  const handleAIGenerateDescription = async (customContext?: string) => {
+    const industryName = currentFormData.industry_id
+      ? industries.find(ind => ind.id === currentFormData.industry_id)?.name || ''
+      : '';
+
+    return await aiGenerationService.generateJobDescription({
+      title: currentFormData.title || '',
+      industry: industryName,
+      location: currentFormData.location || '',
+      salary: currentFormData.salary || '',
+      yearsExperience: currentFormData.years_experienced || undefined
+    }, customContext);
+  };
+
   // Memoized form fields to prevent recreation on each render
   const formFields = useMemo(() => [
     {
@@ -434,9 +489,47 @@ const JobManagement: React.FC = () => {
     {
       name: 'brief_description',
       label: 'Mô tả công việc',
-      type: 'editor' as const,
+      type: 'custom' as const,
       required: true,
-      placeholder: 'Nhập mô tả ngắn gọn về công việc'
+      render: (value: any, onChange: (value: any) => void) => {
+        return (
+          <div className="space-y-2">
+            {/* AI Helper Section */}
+            <div className="p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                <span className="text-sm font-semibold text-purple-900">AI Assistant</span>
+              </div>
+              <AIGenerateButton
+                label="Tạo mô tả với AI"
+                onGenerate={handleAIGenerateDescription}
+                onApply={(content) => {
+                  onChange(content);
+                  setCurrentFormData({ ...currentFormData, brief_description: content });
+                }}
+                disabled={false}
+                size="sm"
+                contextPlaceholder="Ví dụ: Nhấn mạnh cơ hội thăng tiến, môi trường trẻ trung, yêu cầu teamwork..."
+              />
+              <p className="text-xs text-purple-600 mt-2">
+                💡 AI sẽ sử dụng mô tả hiện tại để cải thiện nội dung. Bạn có thể thêm yêu cầu cụ thể trong popup nếu cần.
+              </p>
+            </div>
+            
+            {/* QuillEditor field */}
+            <QuillEditor
+              value={value || ''}
+              onChange={(newValue) => {
+                onChange(newValue);
+                setCurrentFormData({ ...currentFormData, brief_description: newValue });
+              }}
+              placeholder="Nhập mô tả ngắn gọn về công việc"
+            />
+          </div>
+        );
+      }
     },
     {
       name: 'requirement',
@@ -497,7 +590,7 @@ const JobManagement: React.FC = () => {
       required: true,
       placeholder: 'Nhập vị trí'
     }
-  ], [companies]);
+  ], [companies, currentFormData, industries]);
 
   // Company options for SelectWithSearch
   const companyOptions = useMemo(() => [
@@ -552,19 +645,17 @@ const JobManagement: React.FC = () => {
 
   // Memoized pagination data
   const paginationData = useMemo(() => {
-    return pagination.totalPages > 1
-      ? {
-          currentPage,
-          totalPages: pagination.totalPages,
-          totalItems: pagination.total,
-          itemsPerPage: pagination.limit,
-          onPageChange: fetchJobs,
-          onItemsPerPageChange: (newLimit: number) => {
-            setPagination(prev => ({ ...prev, limit: newLimit }));
-            fetchJobs(1, false, newLimit);
-          }
-        }
-      : undefined;
+    return {
+      currentPage,
+      totalPages: pagination.totalPages,
+      totalItems: pagination.total,
+      itemsPerPage: pagination.limit,
+      onPageChange: fetchJobs,
+      onItemsPerPageChange: (newLimit: number) => {
+        setPagination(prev => ({ ...prev, limit: newLimit }));
+        fetchJobs(1, false, newLimit);
+      }
+    };
   }, [currentPage, pagination, fetchJobs]);
 
   // Format jobs data for editing to ensure industry_id and company_id are in the correct format
@@ -598,11 +689,24 @@ const JobManagement: React.FC = () => {
           onFilter: () => fetchJobs(currentPage, false)
         }}
         action={{
+          showEditAction: (job: JobForEdit) => job.version_status === 'draft',
+          showDeleteAction: true,
           additionalActions: (job: JobForEdit) => {
             const actions = [];
             
-            // Add review version action when status is pending_review (waiting for request)
-            if (job.version_status === 'pending_review') {
+            // DRAFT: Show preview only (edit & delete are default actions)
+            if (job.version_status === 'draft') {
+              actions.push({
+                label: 'Xem trước',
+                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+                onClick: () => handlePreview(job),
+                className: 'text-green-600 hover:text-green-800 cursor-pointer',
+                type: 'default'
+              });
+            }
+            
+            // PENDING_REVIEW: Show approve/reject & preview (delete is default action)
+            else if (job.version_status === 'pending_review') {
               actions.push({
                 label: 'Duyệt/Từ chối',
                 icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
@@ -610,10 +714,17 @@ const JobManagement: React.FC = () => {
                 className: 'text-green-600 hover:text-green-800 cursor-pointer',
                 type: 'add'
               });
+              actions.push({
+                label: 'Xem trước',
+                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+                onClick: () => handlePreview(job),
+                className: 'text-green-600 hover:text-green-800 cursor-pointer',
+                type: 'default'
+              });
             }
-
-            // Only show "Xem trực tiếp" if the job has an approved version that is live
-            if (job.version_status === 'approved') {
+            
+            // APPROVED: Show view live & unpublish (delete is default action)
+            else if (job.version_status === 'approved') {
               actions.push({
                 label: 'Xem trực tiếp',
                 icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
@@ -621,16 +732,14 @@ const JobManagement: React.FC = () => {
                 className: 'text-blue-600 hover:text-blue-800 cursor-pointer',
                 type: 'default'
               });
+              actions.push({
+                label: 'Tắt công khai',
+                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>,
+                onClick: () => handleUnpublish(job),
+                className: 'text-orange-600 hover:text-orange-800 cursor-pointer',
+                type: 'default'
+              });
             }
-            
-            // Always show preview button
-            actions.push({
-              label: 'Xem trước',
-              icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
-              onClick: () => handlePreview(job),
-              className: 'text-green-600 hover:text-green-800 cursor-pointer',
-              type: 'default'
-            });
             
             return actions;
           }
@@ -646,6 +755,21 @@ const JobManagement: React.FC = () => {
         onApprove={handleApproveVersion}
         onReject={handleRejectVersion}
         isLoading={loading}
+      />
+      
+      {/* Unpublish Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showUnpublishModal}
+        onClose={() => {
+          setShowUnpublishModal(false);
+          setJobToUnpublish(null);
+        }}
+        onConfirm={confirmUnpublish}
+        title="Xác nhận tắt công khai"
+        message={`Bạn có chắc chắn muốn tắt công khai tin tuyển dụng "${jobToUnpublish?.title}"? Tin này sẽ chuyển về trạng thái bản nháp.`}
+        confirmText="Tắt công khai"
+        cancelText="Hủy"
+        type="warning"
       />
     </>
   );

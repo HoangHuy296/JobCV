@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const { getAllCVs, getUserCVs, uploadCV, downloadCV, deleteCV, checkCVInApplications } = require('../controllers/CVController');
+const { getAllCVs, getUserCVs, uploadCV, downloadCV, deleteCV, checkCVInApplications, extractCVInfo, generateCVSummary, getCVImprovementSuggestions } = require('../controllers/CVController');
 const authenticate = require('../middleware/auth');
 const optionalAuth = require('../middleware/optionalAuth');
 
@@ -172,6 +172,58 @@ router.post('/', authenticate, upload.single('file'), uploadCV);
 
 /**
  * @swagger
+ * /api/cvs/{id}/check-applications:
+ *   get:
+ *     summary: Check if CV is used in job applications
+ *     tags: [CVs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: CV ID
+ *     responses:
+ *       200:
+ *         description: CV application check result
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: CV not found
+ */
+router.get('/:id/check-applications', authenticate, checkCVInApplications);
+
+/**
+ * @swagger
+ * /api/cvs/{id}/extract:
+ *   post:
+ *     summary: Extract information from CV using Gemini AI
+ *     tags: [CVs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: CV ID
+ *     responses:
+ *       200:
+ *         description: Extracted CV information
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: CV not found
+ *       500:
+ *         description: Extraction failed
+ */
+router.post('/:id/extract', authenticate, extractCVInfo);
+
+/**
+ * @swagger
  * /api/cvs/{id}:
  *   get:
  *     summary: Download a CV file
@@ -224,31 +276,6 @@ router.get('/:id', optionalAuth, downloadCV);
 
 /**
  * @swagger
- * /api/cvs/{id}/check-applications:
- *   get:
- *     summary: Check if CV is used in job applications
- *     tags: [CVs]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: CV ID
- *     responses:
- *       200:
- *         description: CV application check result
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: CV not found
- */
-router.get('/:id/check-applications', authenticate, checkCVInApplications);
-
-/**
- * @swagger
  * /api/cvs/{id}:
  *   delete:
  *     summary: Delete a CV
@@ -281,5 +308,8 @@ router.get('/:id/check-applications', authenticate, checkCVInApplications);
  */
 router.delete('/:id', authenticate, deleteCV);
 
+// AI-powered routes
+router.post('/:id/ai/generate-summary', authenticate, generateCVSummary);
+router.post('/:id/ai/improvement-suggestions', authenticate, getCVImprovementSuggestions);
 
 module.exports = router;

@@ -146,3 +146,20 @@ export const getUserSubscribedCompanies = async (page: number = 1, limit: number
     throw error;
   }
 };
+
+// Get top companies based on subscription count and job likes
+export interface TopCompany extends Company {
+  subscriber_count: number;
+  total_job_likes: number;
+  active_jobs: number;
+}
+
+export const getTopCompanies = async (limit: number = 10): Promise<TopCompany[]> => {
+  try {
+    const response = await api.get(`/companies/top?limit=${limit}`);
+    return response.data.result;
+  } catch (error) {
+    console.error('Error getting top companies:', error);
+    throw error;
+  }
+};

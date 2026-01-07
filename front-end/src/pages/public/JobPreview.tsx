@@ -110,21 +110,6 @@ const JobPreview: React.FC = () => {
         setShowReviewModal(true);
     };
 
-    // Format salary for display
-    const formatSalary = (salary: string): string => {
-        if (!salary) return 'Thỏa thuận';
-
-        // If salary contains a range (e.g., "5000000-10000000")
-        if (salary.includes('-')) {
-            const [min, max] = salary.split('-');
-            const formattedMin = parseInt(min).toLocaleString('vi-VN');
-            const formattedMax = parseInt(max).toLocaleString('vi-VN');
-            return `${formattedMin} - ${formattedMax} VNĐ`;
-        }
-
-        // If salary is a single value
-        return `${parseInt(salary).toLocaleString('vi-VN')} VNĐ`;
-    };
 
     // Format date for display
     const formatDate = (dateString: string): string => {
@@ -295,7 +280,7 @@ const JobPreview: React.FC = () => {
                                                 <div>
                                                     <h3 className="text-sm font-medium text-gray-900">Mức lương</h3>
                                                     <p className="text-gray-600">
-                                                        {job.salary ? formatSalary(job.salary) : 'Thỏa thuận'}
+                                                        {job.salary || 'Thỏa thuận'}
                                                     </p>
                                                 </div>
                                             </div>
@@ -368,7 +353,7 @@ const JobPreview: React.FC = () => {
                                     <div>
                                         <div className="mb-4">
                                             <h3 className="text-sm font-medium text-gray-500 mb-1">Mức lương</h3>
-                                            <p className="text-base font-semibold text-gray-900">{job.salary ? formatSalary(job.salary) : 'Thỏa thuận'}</p>
+                                            <p className="text-base font-semibold text-gray-900">{job.salary || 'Thỏa thuận'}</p>
                                         </div>
                                         <div className="mb-4">
                                             <h3 className="text-sm font-medium text-gray-500 mb-1">Địa điểm</h3>

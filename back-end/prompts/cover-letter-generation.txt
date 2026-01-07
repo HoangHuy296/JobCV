@@ -1,0 +1,15 @@
+Generate a professional cover letter based on the candidate's CV and job description.
+
+Candidate Information:
+{cv_data}
+
+Job Information:
+{job_data}
+
+Create a compelling cover letter that:
+1. Highlights relevant skills and experience
+2. Shows enthusiasm for the position
+3. Demonstrates understanding of the company
+4. Is professional and concise (300-400 words)
+
+Return the cover letter in plain text format, ready to use.

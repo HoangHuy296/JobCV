@@ -27,7 +27,7 @@ const UserDashboard: React.FC<UserDashboardProps> = () => {
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Thao Tác Nhanh</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
-            onClick={() => navigate('/profile')}
+            onClick={() => navigate('/quan-ly-cv')}
             className="bg-white border border-gray-100 p-6 hover:border-gray-200 transition-all text-left group"
           >
             <div className="flex items-start justify-between mb-4">
@@ -36,12 +36,12 @@ const UserDashboard: React.FC<UserDashboardProps> = () => {
               </svg>
               <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">→</span>
             </div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-1">Hồ sơ của tôi</h3>
-            <p className="text-xs text-gray-500">Quản lý thông tin cá nhân</p>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Quản lý CV</h3>
+            <p className="text-xs text-gray-500">Tạo và quản lý CV của bạn</p>
           </button>
           
           <button
-            onClick={() => navigate('/applications')}
+            onClick={() => navigate('/don-ung-tuyen')}
             className="bg-white border border-gray-100 p-6 hover:border-gray-200 transition-all text-left group"
           >
             <div className="flex items-start justify-between mb-4">
@@ -55,17 +55,17 @@ const UserDashboard: React.FC<UserDashboardProps> = () => {
           </button>
           
           <button
-            onClick={() => navigate('/cv')}
+            onClick={() => navigate('/cong-viec-da-thich')}
             className="bg-white border border-gray-100 p-6 hover:border-gray-200 transition-all text-left group"
           >
             <div className="flex items-start justify-between mb-4">
               <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
               <span className="text-xs text-gray-400 group-hover:text-gray-600 transition-colors">→</span>
             </div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-1">CV của tôi</h3>
-            <p className="text-xs text-gray-500">Tạo và quản lý CV</p>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Công việc đã thích</h3>
+            <p className="text-xs text-gray-500">Xem các công việc yêu thích</p>
           </button>
         </div>
       </div>
@@ -103,7 +103,7 @@ const UserDashboard: React.FC<UserDashboardProps> = () => {
           </svg>
           <p className="text-sm text-gray-500 mb-4">Chưa có hoạt động gần đây</p>
           <button 
-            onClick={() => navigate('/jobs')}
+            onClick={() => navigate('/viec-lam')}
             className="text-sm text-gray-900 border border-gray-200 px-4 py-2 hover:bg-gray-50 transition-colors"
           >
             Tìm kiếm công việc

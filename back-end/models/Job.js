@@ -143,8 +143,8 @@ class Job {
 
     // Add filtering conditions
     if (filters.search) {
-      query += ` AND (j.title LIKE ? OR j.brief_description LIKE ? OR j.requirement LIKE ? OR jv.title LIKE ? OR jv.brief_description LIKE ? OR jv.requirement LIKE ?)`;
-      values.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`);
+      query += ` AND (j.title LIKE ? OR jv.title LIKE ? OR c.name LIKE ?)`;
+      values.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`);
     }
 
     if (filters.company) {

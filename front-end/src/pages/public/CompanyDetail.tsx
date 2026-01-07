@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getCompanyById, subscribeToCompany, unsubscribeFromCompany, checkSubscriptionStatus, type Company } from '../../api/companyService';
+import { getCompanyById, subscribeToCompany, unsubscribeFromCompany, checkSubscriptionStatus, getTopCompanies, type Company, type TopCompany } from '../../api/companyService';
 import { getAllJobs, type Job } from '../../api/jobService';
 import { useUser } from '../../contexts/UserContext';
 import { toast } from 'react-toastify';
@@ -32,6 +32,8 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ id: propId }) => {
   const [companyJobs, setCompanyJobs] = useState<Job[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [isLoginConfirmModalOpen, setIsLoginConfirmModalOpen] = useState(false);
+  const [topCompanies, setTopCompanies] = useState<TopCompany[]>([]);
+  const [loadingTopCompanies, setLoadingTopCompanies] = useState(false);
   
   // Pagination and filter states
   const [currentPage, setCurrentPage] = useState(1);
@@ -176,6 +178,24 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ id: propId }) => {
   useEffect(() => {
     fetchCompanyData();
   }, [fetchCompanyData, companyId]);
+
+  // Fetch top companies
+  const fetchTopCompanies = useCallback(async () => {
+    try {
+      setLoadingTopCompanies(true);
+      const companies = await getTopCompanies(10);
+      setTopCompanies(companies);
+    } catch (error) {
+      console.error('Error fetching top companies:', error);
+      setTopCompanies([]);
+    } finally {
+      setLoadingTopCompanies(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTopCompanies();
+  }, [fetchTopCompanies]);
 
   // Fetch company jobs with filters and pagination
   useEffect(() => {
@@ -585,61 +605,70 @@ const CompanyDetail: React.FC<CompanyDetailProps> = ({ id: propId }) => {
               <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-6 border border-indigo-200">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-gray-900">Công ty hàng đầu</h2>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800">
-                    Top 10
-                  </span>
                 </div>
                 <div className="space-y-4">
-                  {/* Top company 1 */}
-                  <div className="flex items-center space-x-4 p-3 bg-white rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <div className="flex-shrink-0 relative">
-                      <div className="bg-gradient-to-br from-blue-400 to-indigo-600 rounded-xl w-12 h-12 flex items-center justify-center text-white font-bold">FPT</div>
-                      <div className="absolute -top-1 -right-1 flex items-center justify-center h-5 w-5 rounded-full bg-yellow-400 border-2 border-white">
-                        <svg className="h-3 w-3 text-yellow-800" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      </div>
+                  {loadingTopCompanies ? (
+                    <div className="flex justify-center items-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900 truncate">FPT Software</h3>
-                      <p className="text-gray-600 text-sm truncate">Công nghệ thông tin</p>
-                      <div className="mt-1 flex items-center text-sm text-gray-500">
-                        <svg className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                  ) : topCompanies.length > 0 ? (
+                    <>
+                      {topCompanies.map((topCompany, index) => (
+                        <div 
+                          key={topCompany.id}
+                          onClick={() => navigate(`/cong-ty/${btoa(topCompany.id.toString())}`)}
+                          className="flex items-center space-x-4 p-3 bg-white rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+                        >
+                          <div className="flex-shrink-0 relative">
+                            {topCompany.logo?.url ? (
+                              <img 
+                                src={topCompany.logo.url} 
+                                alt={topCompany.name}
+                                className="rounded-xl w-12 h-12 object-cover"
+                              />
+                            ) : (
+                              <div className="bg-gradient-to-br from-blue-400 to-indigo-600 rounded-xl w-12 h-12 flex items-center justify-center text-white font-bold text-sm">
+                                {topCompany.name.substring(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                            {index < 3 && (
+                              <div className="absolute -top-1 -right-1 flex items-center justify-center h-5 w-5 rounded-full bg-yellow-400 border-2 border-white">
+                                <svg className="h-3 w-3 text-yellow-800" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-gray-900 truncate">{topCompany.name}</h3>
+                            <p className="text-gray-600 text-sm truncate">{topCompany.location || 'Chưa cập nhật'}</p>
+                            <div className="mt-1 flex items-center text-sm text-gray-500">
+                              <svg className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                              </svg>
+                              {topCompany.subscriber_count > 0 
+                                ? `${topCompany.subscriber_count.toLocaleString()} người theo dõi` 
+                                : 'Chưa có người theo dõi'}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <button 
+                        onClick={() => navigate('/cong-ty')}
+                        className="w-full py-3 text-center text-indigo-600 hover:text-indigo-800 font-medium bg-white rounded-xl border border-indigo-200 hover:border-indigo-300 hover:shadow-sm transition-all duration-200 flex items-center justify-center"
+                      >
+                        <span>Xem tất cả công ty</span>
+                        <svg className="ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
                         </svg>
-                        2.5k người theo dõi
-                      </div>
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      Chưa có dữ liệu công ty hàng đầu
                     </div>
-                  </div>
-                  
-                  {/* Top company 2 */}
-                  <div className="flex items-center space-x-4 p-3 bg-white rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all duration-200 cursor-pointer">
-                    <div className="flex-shrink-0 relative">
-                      <div className="bg-gradient-to-br from-green-400 to-teal-600 rounded-xl w-12 h-12 flex items-center justify-center text-white font-bold">VNG</div>
-                      <div className="absolute -top-1 -right-1 flex items-center justify-center h-5 w-5 rounded-full bg-yellow-400 border-2 border-white">
-                        <svg className="h-3 w-3 text-yellow-800" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900 truncate">VNG Corporation</h3>
-                      <p className="text-gray-600 text-sm truncate">Công nghệ & Truyền thông</p>
-                      <div className="mt-1 flex items-center text-sm text-gray-500">
-                        <svg className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
-                        </svg>
-                        1.8k người theo dõi
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <button className="w-full py-3 text-center text-indigo-600 hover:text-indigo-800 font-medium bg-white rounded-xl border border-indigo-200 hover:border-indigo-300 hover:shadow-sm transition-all duration-200 flex items-center justify-center">
-                    <span>Xem tất cả công ty hàng đầu</span>
-                    <svg className="ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+                  )}
                 </div>
               </div>
             </div>

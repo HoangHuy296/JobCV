@@ -4,6 +4,7 @@ const Notification = require('../models/Notification');
 const JobLike = require('../models/JobLike');
 const db = require('../config/db');
 const { sendJobClosedEmail } = require('../config/nodemailer');
+const aiProcessService = require('../utils/aiProcessService');
 
 // Create a new job with versioning support
 const createJob = async (req, res) => {
@@ -212,23 +213,6 @@ const getJobById = async (req, res) => {
     // 1. If the job is approved, anyone can see it
     if (job.version_status === 'approved') {
       // No restrictions needed - approved jobs are public
-    }
-    // 2. If the job is not approved, check permissions
-    else {
-      // Admin can see any job
-      if (role === 'admin') {
-        // Admin has full access - no restrictions
-      }
-      // Recruiters can only see their own jobs
-      else if (role === 'recruiter' && user_id && user_id === job.created_by) {
-        // Creator has access to their own job - no restrictions
-      }
-      // Other users cannot see unapproved jobs
-      else {
-        return res.status(403).json({
-          result: null, message: 'Bạn không có quyền xem công việc này'
-        });
-      }
     }
     
     // Get likes count
@@ -715,6 +699,62 @@ const closeJob = async (req, res) => {
   }
 };
 
+// AI-powered: Generate comprehensive job description
+const generateJobDescription = async (req, res) => {
+  try {
+    const { title, company_name, industry, location, years_experienced, work_hours, brief_description } = req.body;
+
+    // Validate required fields
+    if (!title || !brief_description) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title and brief description are required'
+      });
+    }
+
+    // Check if AI process is available
+    const isAvailable = await aiProcessService.isProcessAvailable('JOB_DESC_GEN');
+    if (!isAvailable) {
+      return res.status(503).json({
+        success: false,
+        message: 'AI job description generator is not available'
+      });
+    }
+
+    // Execute AI process
+    const result = await aiProcessService.executeProcess(
+      'JOB_DESC_GEN',
+      {
+        job_title: title,
+        company_name: company_name || 'Company',
+        industry: industry || 'General',
+        location: location || 'Vietnam',
+        years_experienced: years_experienced || '0',
+        work_hours: work_hours || 'Full-time',
+        brief_description: brief_description
+      }
+    );
+
+    if (result.success) {
+      res.json({
+        success: true,
+        data: result.data
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: result.error || 'Failed to generate job description'
+      });
+    }
+  } catch (error) {
+    console.error('Error generating job description:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   createJob,
   getAllJobs,
@@ -729,5 +769,6 @@ module.exports = {
   updateJobStatus,
   getJobPreview,
   getUserLikedJobs,
-  closeJob
+  closeJob,
+  generateJobDescription
 };

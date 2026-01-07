@@ -141,21 +141,17 @@ const RecruiterCVManagement: React.FC = () => {
       loading={loading}
       onDelete={handleDelete}
       onRefresh={() => fetchCVs(currentPage)}
-      pagination={
-        pagination.totalPages > 1
-          ? {
-              currentPage,
-              totalPages: pagination.totalPages,
-              totalItems: pagination.total,
-              itemsPerPage: pagination.limit,
-              onPageChange: fetchCVs,
-              onItemsPerPageChange: (newLimit: number) => {
-                setPagination(prev => ({ ...prev, limit: newLimit }));
-                fetchCVs(1, false, newLimit);
-              }
-            }
-          : undefined
-      }
+      pagination={{
+        currentPage,
+        totalPages: pagination.totalPages,
+        totalItems: pagination.total,
+        itemsPerPage: pagination.limit,
+        onPageChange: fetchCVs,
+        onItemsPerPageChange: (newLimit: number) => {
+          setPagination(prev => ({ ...prev, limit: newLimit }));
+          fetchCVs(1, false, newLimit);
+        }
+      }}
       filters={
         {
           searchTerm,

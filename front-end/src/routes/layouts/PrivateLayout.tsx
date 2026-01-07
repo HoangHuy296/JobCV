@@ -85,6 +85,7 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
             { name: 'Quản lý vai trò', path: '/admin/quan-ly-vai-tro', category: 'system' },
             { name: 'Quản lý hình ảnh', path: '/admin/quan-ly-hinh-anh', category: 'system' },
             { name: 'Quản lý thông báo', path: '/admin/quan-ly-thong-bao', category: 'system' },
+            { name: 'Quản lý AI', path: '/admin/cau-hinh-ai', category: 'system' },
           ];
           break;
         case 'recruiter':
@@ -95,7 +96,7 @@ const PrivateLayout: React.FC<PropsWithChildren> = React.memo(({ children }) => 
             { name: 'Quản lý công ty', path: '/nha-tuyen-dung/quan-ly-cong-ty', category: 'business' },
             { name: 'Quản lý tin tuyển dụng', path: '/nha-tuyen-dung/quan-ly-tin-tuyen-dung', category: 'business' },
             { name: 'Quản lý CV ứng tuyển', path: '/nha-tuyen-dung/quan-ly-cv-ung-tuyen', category: 'business' },
-            { name: 'Tìm kiếm ứng viên', path: '/nha-tuyen-dung/tim-kiem-ung-vien', category: 'business' },
+            { name: 'Ứng viên nổi bật', path: '/nha-tuyen-dung/tim-kiem-ung-vien', category: 'business' },
             // { name: 'Quản lý chiến dịch', path: '/nha-tuyen-dung/quan-ly-chien-dich', category: 'business' },
           ];
           break;

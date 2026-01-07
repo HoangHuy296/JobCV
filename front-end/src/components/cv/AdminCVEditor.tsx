@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   LuPlus, LuTrash2, LuGripVertical, LuChevronDown, LuChevronRight,
   LuUser, LuTarget, LuWrench, LuBriefcase, LuGraduationCap,
@@ -14,16 +14,15 @@ interface FieldDefinition {
   required: boolean;
 }
 
-interface SectionPosition {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+interface SectionLayout {
+  row: number;           // Row index (0, 1, 2, ...)
+  column_width: number;  // Width as fraction: 1 (full), 0.5 (1/2), 0.33 (1/3), 0.25 (1/4), 0.67 (2/3), 0.75 (3/4)
+  min_height?: number;   // Optional minimum height in pixels
 }
 
 interface TemplateSectionData {
   section: CVSection;
-  position: SectionPosition;
+  layout: SectionLayout;
   is_visible: boolean;
   display_order: number;
 }
@@ -47,12 +46,58 @@ const AdminCVEditor: React.FC<AdminCVEditorProps> = ({
   availableSections = []
 }) => {
   const [selectedSectionIndex, setSelectedSectionIndex] = useState<number | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [showSectionLibrary, setShowSectionLibrary] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   const [draggingFieldIndex, setDraggingFieldIndex] = useState<number | null>(null);
+  const [draggingSectionIndex, setDraggingSectionIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [hasAutoAdded, setHasAutoAdded] = useState(false);
+
+  // Column width options
+  const COLUMN_WIDTHS = [
+    { value: 1, label: 'Full (1/1)', display: '100%' },
+    { value: 0.5, label: 'Half (1/2)', display: '50%' },
+    { value: 0.33, label: 'Third (1/3)', display: '33%' },
+    { value: 0.67, label: 'Two Thirds (2/3)', display: '67%' },
+    { value: 0.25, label: 'Quarter (1/4)', display: '25%' },
+    { value: 0.75, label: 'Three Quarters (3/4)', display: '75%' }
+  ];
+
+  // Auto-add specific sections with predefined layout on mount if no sections exist
+  useEffect(() => {
+    if (!hasAutoAdded && sections.length === 0 && availableSections.length > 0) {
+      // Define sections to add with their row and column width
+      const sectionsToAdd = [
+        { keyName: 'personal_info', row: 0, columnWidth: 1, minHeight: 150 },
+        { keyName: 'skills', row: 1, columnWidth: 0.5, minHeight: 200 },
+        { keyName: 'hobbies', row: 1, columnWidth: 0.5, minHeight: 200 },
+        { keyName: 'education', row: 2, columnWidth: 1, minHeight: 150 },
+        { keyName: 'work_experience', row: 3, columnWidth: 1, minHeight: 300 },
+        { keyName: 'references', row: 4, columnWidth: 1, minHeight: 100 }
+      ];
+
+      const newSections: TemplateSectionData[] = [];
+
+      sectionsToAdd.forEach((sectionConfig, index) => {
+        const section = availableSections.find(s => s.key_name === sectionConfig.keyName);
+        if (section) {
+          newSections.push({
+            section,
+            layout: {
+              row: sectionConfig.row,
+              column_width: sectionConfig.columnWidth,
+              min_height: sectionConfig.minHeight
+            },
+            is_visible: true,
+            display_order: index
+          });
+        }
+      });
+
+      onSectionsChange(newSections);
+      setHasAutoAdded(true);
+    }
+  }, [availableSections, sections.length, hasAutoAdded, onSectionsChange]);
 
   const toggleSection = (sectionId: number) => {
     const newExpanded = new Set(expandedSections);
@@ -69,18 +114,22 @@ const AdminCVEditor: React.FC<AdminCVEditorProps> = ({
   };
 
   const addSection = (section: CVSection) => {
+    // Find the highest row number and add to next row
+    const maxRow = sections.length > 0 
+      ? Math.max(...sections.map(s => s.layout.row))
+      : -1;
+    
     const newSection: TemplateSectionData = {
       section,
-      position: {
-        x: 10,
-        y: 10,
-        width: 80,
-        height: 20
+      layout: {
+        row: maxRow + 1,
+        column_width: 1,  // Default to full width
+        min_height: 150
       },
       is_visible: true,
-      display_order: 0
+      display_order: sections.length
     };
-    onSectionsChange([newSection, ...sections]);
+    onSectionsChange([...sections, newSection]);
     setShowSectionLibrary(false);
   };
 
@@ -132,68 +181,185 @@ const AdminCVEditor: React.FC<AdminCVEditorProps> = ({
     setSelectedSectionIndex(null);
   };
 
-  const updatePosition = (index: number, updates: Partial<SectionPosition>) => {
+  const updateLayout = (index: number, updates: Partial<SectionLayout>) => {
     const newSections = [...sections];
     newSections[index] = {
       ...newSections[index],
-      position: {
-        ...newSections[index].position,
+      layout: {
+        ...newSections[index].layout,
         ...updates
       }
     };
+    
+    // If column width changed, recalculate rows to respect width constraints
+    if (updates.column_width !== undefined) {
+      let currentRow = 0;
+      let currentRowWidth = 0;
+      
+      newSections.forEach((section) => {
+        const sectionWidth = section.layout.column_width;
+        
+        // Check if adding this section would exceed row width
+        if (currentRowWidth + sectionWidth > 1.01) {
+          currentRow++;
+          currentRowWidth = 0;
+        }
+        
+        section.layout.row = currentRow;
+        currentRowWidth += sectionWidth;
+        
+        // If this section fills the row completely, move to next row
+        if (currentRowWidth >= 0.99) {
+          currentRow++;
+          currentRowWidth = 0;
+        }
+      });
+    }
+    
     onSectionsChange(newSections);
   };
 
-  const handleMouseDown = (e: React.MouseEvent, index: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!containerRef.current) return;
-    
-    const container = containerRef.current.getBoundingClientRect();
-    const sectionElement = e.currentTarget as HTMLElement;
-    const sectionRect = sectionElement.getBoundingClientRect();
-    
-    const offsetX = e.clientX - sectionRect.left;
-    const offsetY = e.clientY - sectionRect.top;
-    
-    setSelectedSectionIndex(index);
-    setIsDragging(true);
-    setDragOffset({ 
-      x: (offsetX / container.width) * 100, 
-      y: (offsetY / container.height) * 100 
-    });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || selectedSectionIndex === null || !containerRef.current) return;
-    
-    e.preventDefault();
-    const container = containerRef.current.getBoundingClientRect();
-    
-    const mouseXPercent = ((e.clientX - container.left) / container.width) * 100;
-    const mouseYPercent = ((e.clientY - container.top) / container.height) * 100;
-
+  // Move section up or down (change row number)
+  const moveSectionUp = (index: number) => {
     const newSections = [...sections];
-    const section = newSections[selectedSectionIndex];
-    const newX = mouseXPercent - dragOffset.x;
-    const newY = mouseYPercent - dragOffset.y;
+    const currentRow = newSections[index].layout.row;
+    if (currentRow === 0) return;
     
-    newSections[selectedSectionIndex] = {
-      ...section,
-      position: {
-        ...section.position,
-        x: Math.max(0, Math.min(100 - section.position.width, newX)),
-        y: Math.max(0, Math.min(100 - section.position.height, newY))
+    newSections[index] = {
+      ...newSections[index],
+      layout: {
+        ...newSections[index].layout,
+        row: currentRow - 1
       }
     };
-    
     onSectionsChange(newSections);
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setDragOffset({ x: 0, y: 0 });
+  const moveSectionDown = (index: number) => {
+    const newSections = [...sections];
+    const currentRow = newSections[index].layout.row;
+    
+    newSections[index] = {
+      ...newSections[index],
+      layout: {
+        ...newSections[index].layout,
+        row: currentRow + 1
+      }
+    };
+    onSectionsChange(newSections);
+  };
+
+  // Group sections by row for rendering
+  const groupSectionsByRow = () => {
+    const rows: { [key: number]: { section: TemplateSectionData; index: number }[] } = {};
+    
+    // Sort sections by display_order first to maintain consistent ordering
+    const sortedSections = [...sections].sort((a, b) => a.display_order - b.display_order);
+    
+    sortedSections.forEach((section, index) => {
+      // Handle sections without layout (from old templates)
+      if (!section.layout) {
+        section.layout = { row: index, column_width: 1, min_height: 150 };
+      }
+      const rowNum = section.layout.row;
+      if (!rows[rowNum]) {
+        rows[rowNum] = [];
+      }
+      // Find original index
+      const originalIndex = sections.findIndex(s => s === section);
+      rows[rowNum].push({ section, index: originalIndex });
+    });
+    
+    // Validate row widths and adjust if needed
+    Object.keys(rows).forEach(rowKey => {
+      const rowNum = Number(rowKey);
+      const rowSections = rows[rowNum];
+      const totalWidth = rowSections.reduce((sum, s) => sum + s.section.layout.column_width, 0);
+      
+      // If total width exceeds 1, split into multiple rows
+      if (totalWidth > 1.01) {
+        let currentRow = rowNum;
+        let currentWidth = 0;
+        const newRows: { [key: number]: typeof rowSections } = {};
+        
+        rowSections.forEach(item => {
+          const width = item.section.layout.column_width;
+          
+          if (currentWidth + width > 1.01) {
+            currentRow++;
+            currentWidth = 0;
+          }
+          
+          if (!newRows[currentRow]) {
+            newRows[currentRow] = [];
+          }
+          newRows[currentRow].push(item);
+          currentWidth += width;
+          
+          if (currentWidth >= 0.99) {
+            currentRow++;
+            currentWidth = 0;
+          }
+        });
+        
+        // Update the rows object
+        delete rows[rowNum];
+        Object.assign(rows, newRows);
+      }
+    });
+    
+    return rows;
+  };
+
+  // Drag and drop for reordering sections
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggingSectionIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggingSectionIndex === null || draggingSectionIndex === index) return;
+    
+    const newSections = [...sections];
+    const draggedSection = newSections[draggingSectionIndex];
+    newSections.splice(draggingSectionIndex, 1);
+    newSections.splice(index, 0, draggedSection);
+    
+    // Recalculate row numbers based on new order and column widths
+    let currentRow = 0;
+    let currentRowWidth = 0;
+    
+    newSections.forEach((section, idx) => {
+      const sectionWidth = section.layout.column_width;
+      
+      // Check if adding this section would exceed row width
+      if (currentRowWidth + sectionWidth > 1.01) { // Small tolerance for floating point
+        currentRow++;
+        currentRowWidth = 0;
+      }
+      
+      section.layout.row = currentRow;
+      currentRowWidth += sectionWidth;
+      
+      // If this section fills the row completely, move to next row
+      if (currentRowWidth >= 0.99) { // Small tolerance for floating point
+        currentRow++;
+        currentRowWidth = 0;
+      }
+    });
+    
+    setDraggingSectionIndex(index);
+    onSectionsChange(newSections);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDraggingSectionIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingSectionIndex(null);
   };
 
   return (
@@ -257,12 +423,17 @@ const AdminCVEditor: React.FC<AdminCVEditorProps> = ({
             return (
               <div
                 key={`${section.id}-${index}`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={handleDrop}
+                onDragEnd={handleDragEnd}
                 className={`border rounded-xl overflow-hidden transition-all ${
                   selectedSectionIndex === index ? 'border-blue-500 ring-2 ring-blue-200 shadow-lg' : 'border-gray-200 hover:border-gray-300 shadow-sm'
-                }`}
+                } ${draggingSectionIndex === index ? 'opacity-50' : ''}`}
               >
                 {/* Section Header */}
-                <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 cursor-pointer transition-all">
+                <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 transition-all">
                   <button
                     onClick={() => toggleSection(section.id)}
                     className="p-0.5 hover:bg-gray-200 rounded"
@@ -273,7 +444,7 @@ const AdminCVEditor: React.FC<AdminCVEditorProps> = ({
                       <LuChevronRight className="w-4 h-4 text-gray-600" />
                     )}
                   </button>
-                  <LuGripVertical className="w-4 h-4 text-gray-400" />
+                  <LuGripVertical className="w-4 h-4 text-gray-400 cursor-move" />
                   <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
                     <Icon className="w-4 h-4 text-blue-600" />
                   </div>
@@ -296,44 +467,66 @@ const AdminCVEditor: React.FC<AdminCVEditorProps> = ({
                 {isExpanded && (
                   <div className="p-4 space-y-3 border-t bg-white">
                     <div className="space-y-3">
-                      <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Vị trí & Kích thước</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold mb-1.5 text-gray-700">X (%)</label>
-                          <input
-                            type="number"
-                            value={sectionData.position.x}
-                            onChange={(e) => updatePosition(index, { x: Number(e.target.value) })}
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                          />
+                      <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">Layout & Kích thước</p>
+                      
+                      {/* Row controls */}
+                      <div className="flex items-center gap-2">
+                        <label className="block text-xs font-semibold text-gray-700 flex-shrink-0">Hàng:</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={sectionData.layout.row + 1}
+                          onChange={(e) => updateLayout(index, { row: Number(e.target.value) - 1 })}
+                          className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                        <div className="flex gap-1 ml-auto">
+                          <button
+                            onClick={() => moveSectionUp(index)}
+                            disabled={index === 0}
+                            className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded"
+                            title="Di chuyển lên"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            onClick={() => moveSectionDown(index)}
+                            disabled={index === sections.length - 1}
+                            className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded"
+                            title="Di chuyển xuống"
+                          >
+                            ↓
+                          </button>
                         </div>
-                        <div>
-                          <label className="block text-xs font-semibold mb-1.5 text-gray-700">Y (%)</label>
-                          <input
-                            type="number"
-                            value={sectionData.position.y}
-                            onChange={(e) => updatePosition(index, { y: Number(e.target.value) })}
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold mb-1.5 text-gray-700">Rộng (%)</label>
-                          <input
-                            type="number"
-                            value={sectionData.position.width}
-                            onChange={(e) => updatePosition(index, { width: Number(e.target.value) })}
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold mb-1.5 text-gray-700">Cao (%)</label>
-                          <input
-                            type="number"
-                            value={sectionData.position.height}
-                            onChange={(e) => updatePosition(index, { height: Number(e.target.value) })}
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                          />
-                        </div>
+                      </div>
+
+                      {/* Column width selector */}
+                      <div>
+                        <label className="block text-xs font-semibold mb-1.5 text-gray-700">Độ rộng cột</label>
+                        <select
+                          value={sectionData.layout.column_width}
+                          onChange={(e) => updateLayout(index, { column_width: Number(e.target.value) })}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          {COLUMN_WIDTHS.map(option => (
+                            <option key={option.value} value={option.value}>
+                              {option.label} - {option.display}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">Các mục cùng hàng sẽ hiển thị cạnh nhau</p>
+                      </div>
+
+                      {/* Min height */}
+                      <div>
+                        <label className="block text-xs font-semibold mb-1.5 text-gray-700">Chiều cao tối thiểu (px)</label>
+                        <input
+                          type="number"
+                          min="50"
+                          step="10"
+                          value={sectionData.layout.min_height || 150}
+                          onChange={(e) => updateLayout(index, { min_height: Number(e.target.value) })}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
                       </div>
                     </div>
 
@@ -480,7 +673,7 @@ const AdminCVEditor: React.FC<AdminCVEditorProps> = ({
       <div className="flex-1 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg p-8 overflow-y-auto overflow-x-hidden">
         <div
           ref={containerRef}
-          className="relative bg-white mx-auto shadow-2xl rounded-sm"
+          className="bg-white mx-auto shadow-2xl rounded-sm flex flex-col"
           style={{
             width: '210mm',
             minHeight: '297mm',
@@ -489,45 +682,59 @@ const AdminCVEditor: React.FC<AdminCVEditorProps> = ({
             backgroundPosition: 'top center',
             backgroundRepeat: 'no-repeat'
           }}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
         >
-          {/* Render sections */}
-          {sections.map((sectionData, index) => {
-            const { section, position } = sectionData;
-            const Icon = getIcon(section.icon);
-            
-            return (
-              <div
-                key={`${section.id}-${index}`}
-                className={`absolute transition-shadow cursor-move ${
-                  selectedSectionIndex === index ? 'ring-2 ring-blue-500 z-10' : ''
-                }`}
-                style={{
-                  left: `${position.x}%`,
-                  top: `${position.y}%`,
-                  width: `${position.width}%`,
-                  height: `${position.height}%`,
-                  userSelect: 'none'
-                }}
-                onMouseDown={(e) => handleMouseDown(e, index)}
-                onClick={() => setSelectedSectionIndex(index)}
-              >
-                <div className="w-full h-full border-2 border-dashed border-blue-400 bg-gradient-to-br from-blue-50 to-blue-100 bg-opacity-90 rounded-lg p-3 flex flex-col shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center">
-                      <Icon className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="text-sm font-bold text-blue-900">{section.name}</span>
-                  </div>
-                  <div className="text-xs text-blue-700 font-medium">
-                    {section.default_fields.fields.length} trường dữ liệu
-                  </div>
+          {/* Render sections grouped by rows */}
+          {Object.entries(groupSectionsByRow())
+            .sort(([rowA], [rowB]) => Number(rowA) - Number(rowB))
+            .map(([rowNum, rowSections]) => {
+              const totalRowWidth = rowSections.reduce((sum, s) => sum + s.section.layout.column_width, 0);
+              
+              return (
+                <div key={`row-${rowNum}`} className="flex gap-2 w-full">
+                  {rowSections.map(({ section: sectionData, index }) => {
+                    const { section, layout } = sectionData;
+                    const Icon = getIcon(section.icon);
+                    console.log(rowSections.length)
+                    return (
+                      <div
+                        key={`${section.id}-${index}`}
+                        className={`transition-all ${
+                          selectedSectionIndex === index ? 'ring-2 ring-blue-500 z-10' : ''
+                        }`}
+                        style={{
+                          flex: `0 0 calc(${(layout.column_width / totalRowWidth) * 100}% - ${rowSections.length > 1 ? '4px' : '0px'})`,
+                          minHeight: `${layout.min_height || 150}px`
+                        }}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDragEnd={handleDragEnd}
+                        onClick={() => setSelectedSectionIndex(index)}
+                      >
+                        <div className="w-full h-full border-2 border-dashed border-blue-400 bg-gradient-to-br from-blue-50 to-blue-100 bg-opacity-90 rounded-lg p-3 flex flex-col shadow-sm cursor-move">
+                          <div className="flex items-center gap-2 mb-2">
+                            <LuGripVertical className="w-4 h-4 text-blue-400" />
+                            <div className="w-6 h-6 bg-blue-600 rounded-md flex items-center justify-center">
+                              <Icon className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="text-sm font-bold text-blue-900">{section.name}</span>
+                            <span className="ml-auto text-xs text-blue-600 font-medium">
+                              {Math.round((layout.column_width / totalRowWidth) * 100)}%
+                            </span>
+                          </div>
+                          <div className="text-xs text-blue-700 font-medium">
+                            {section.default_fields.fields.length} trường dữ liệu
+                          </div>
+                          <div className="text-xs text-blue-600 mt-1">
+                            Hàng {layout.row + 1}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
       </div>
     </div>

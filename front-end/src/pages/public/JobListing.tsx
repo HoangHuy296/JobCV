@@ -6,6 +6,7 @@ import { useIndustryContext } from '../../contexts/IndustryContext';
 import { useLocationContext } from '../../contexts/LocationContext';
 import { getAllJobs, type Job } from '../../api/jobService';
 import SelectWithSearch from '../../components/common/SelectWithSearch';
+import { useDebounce } from '../../hooks/useDebounce';
 
 const YEARS_EXPERIENCE_OPTIONS = [
   { value: '0', label: 'Không yêu cầu kinh nghiệm' },
@@ -29,7 +30,7 @@ const SALARY_RANGES = [
 const JobListing: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedIndustry, setSelectedIndustry] = useState('');
+  const [selectedIndustry, setSelectedIndustry] = useState<number | null>(null);
   const [selectedLocation, setSelectedLocation] = useState('');
   const [selectedSalary, setSelectedSalary] = useState('all');
   const [selectedExperience, setSelectedExperience] = useState('');
@@ -44,9 +45,16 @@ const JobListing: React.FC = () => {
   
   const [currentPage, setCurrentPage] = useState(1);
   const jobsPerPage = 6;
+  const [immediateSearch, setImmediateSearch] = useState(false);
+  
+  // Debounce search term with 3s delay
+  const debouncedSearchTerm = useDebounce(searchTerm, 3000);
+  
+  // Use immediate search term if form was submitted, otherwise use debounced
+  const activeSearchTerm = immediateSearch ? searchTerm : debouncedSearchTerm;
   
   // Filter type state
-  const [activeFilterType, setActiveFilterType] = useState<'location' | 'salary' | 'experience' | 'industry'>('location');
+  const [activeFilterType, setActiveFilterType] = useState<'industry' | 'salary' | 'experience' | 'location'>('industry');
   const filterScrollRef = useRef<HTMLDivElement>(null);
   
   // Process locations from context
@@ -71,10 +79,10 @@ const JobListing: React.FC = () => {
         const response = await getAllJobs(
           currentPage, 
           jobsPerPage, 
-          searchTerm, 
+          activeSearchTerm, 
           '', // company filter
           selectedLocation, 
-          selectedIndustry,
+          selectedIndustry?.toString() || '',
           { role: 'guest' } // Explicitly pass 'guest' role
         );
         
@@ -140,11 +148,12 @@ const JobListing: React.FC = () => {
         console.error('Error fetching jobs:', err);
       } finally {
         setLoading(false);
+        setImmediateSearch(false); // Reset immediate search flag
       }
     };
     
     fetchJobs();
-  }, [currentPage, searchTerm, selectedIndustry, selectedLocation, selectedSalary, selectedExperience]);
+  }, [currentPage, activeSearchTerm, selectedIndustry, selectedLocation, selectedSalary, selectedExperience]);
   
   // Memoize pagination array to prevent unnecessary re-renders
   const paginationArray = useMemo(() => 
@@ -154,6 +163,7 @@ const JobListing: React.FC = () => {
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(1); // Reset to first page when searching
+    setImmediateSearch(true); // Trigger immediate search, bypass debounce
   }, []);
   
   const handleViewDetail = (job: Job) => {
@@ -182,19 +192,32 @@ const JobListing: React.FC = () => {
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Tìm kiếm tin tuyển dụng, vị trí, công ty..."
+                  placeholder="Tìm kiếm theo tên công việc hoặc công ty..."
                   className="w-full px-6 py-4 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white focus:border-transparent bg-white/80"
                 />
               </div>
               <button
                 type="submit"
-                className="px-8 py-4 bg-white text-indigo-700 font-bold rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white transition-all duration-300 shadow-lg hover:shadow-xl cursor-pointer"
+                disabled={loading}
+                className="px-8 py-4 bg-white text-indigo-700 font-bold rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white transition-all duration-300 shadow-lg hover:shadow-xl cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="flex items-center">
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  Tìm kiếm
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Đang tìm...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      Tìm kiếm
+                    </>
+                  )}
                 </span>
               </button>
             </form>
@@ -388,14 +411,14 @@ const JobListing: React.FC = () => {
                       <>
                         <button 
                           onClick={() => {
-                            setSelectedIndustry('');
+                            setSelectedIndustry(null);
                             setCurrentPage(1);
                           }}
-                          className={`whitespace-nowrap px-4 py-2.5 rounded-full text-sm font-medium border transition-all duration-200 flex items-center justify-center min-h-[40px] cursor-pointer transform hover:scale-105 ${selectedIndustry === '' ? 'bg-blue-500 text-white border-blue-500 shadow-md' : 'bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-600 border-gray-200 shadow-sm'}`}
+                          className={`whitespace-nowrap px-4 py-2.5 rounded-full text-sm font-medium border transition-all duration-200 flex items-center justify-center min-h-[40px] cursor-pointer transform hover:scale-105 ${selectedIndustry === null ? 'bg-blue-500 text-white border-blue-500 shadow-md' : 'bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-600 border-gray-200 shadow-sm'}`}
                         >
                           <span className="flex items-center">
                             <span>Tất cả ngành nghề</span>
-                            {selectedIndustry === '' && (
+                            {selectedIndustry === null && (
                               <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
@@ -406,14 +429,14 @@ const JobListing: React.FC = () => {
                           <button 
                             key={industry.id} 
                             onClick={() => {
-                              setSelectedIndustry(industry.name);
+                              setSelectedIndustry(industry.id);
                               setCurrentPage(1);
                             }}
-                            className={`whitespace-nowrap px-4 py-2.5 rounded-full text-sm font-medium border transition-all duration-200 flex items-center justify-center min-h-[40px] cursor-pointer transform hover:scale-105 ${selectedIndustry === industry.name ? 'bg-blue-500 text-white border-blue-500 shadow-md' : 'bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-600 border-gray-200 shadow-sm'}`}
+                            className={`whitespace-nowrap px-4 py-2.5 rounded-full text-sm font-medium border transition-all duration-200 flex items-center justify-center min-h-[40px] cursor-pointer transform hover:scale-105 ${selectedIndustry === industry.id ? 'bg-blue-500 text-white border-blue-500 shadow-md' : 'bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-600 border-gray-200 shadow-sm'}`}
                           >
                             <span className="flex items-center">
                               <span>{industry.name}</span>
-                              {selectedIndustry === industry.name && (
+                              {selectedIndustry === industry.id && (
                                 <svg className="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
@@ -502,7 +525,7 @@ const JobListing: React.FC = () => {
               && <button 
                 onClick={() => {
                   setSearchTerm('');
-                  setSelectedIndustry('');
+                  setSelectedIndustry(null);
                   setSelectedLocation('');
                   setSelectedSalary('all');
                   setSelectedExperience('');

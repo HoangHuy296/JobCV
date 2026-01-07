@@ -67,19 +67,17 @@ const UserManagementRefactored: React.FC = () => {
 
   // Memoized pagination data
   const paginationData = useMemo(() => {
-    return pagination.totalPages > 1
-      ? {
-          currentPage,
-          totalPages: pagination.totalPages,
-          totalItems: pagination.total,
-          itemsPerPage: pagination.limit,
-          onPageChange: fetchUsers,
-          onItemsPerPageChange: (newLimit: number) => {
-            setPagination(prev => ({ ...prev, limit: newLimit }));
-            fetchUsers(1, false, newLimit);
-          }
-        }
-      : undefined;
+    return {
+      currentPage,
+      totalPages: pagination.totalPages,
+      totalItems: pagination.total,
+      itemsPerPage: pagination.limit,
+      onPageChange: fetchUsers,
+      onItemsPerPageChange: (newLimit: number) => {
+        setPagination(prev => ({ ...prev, limit: newLimit }));
+        fetchUsers(1, false, newLimit);
+      }
+    };
   }, [currentPage, pagination, fetchUsers]);
 
   // Load users on component mount
@@ -176,13 +174,21 @@ const UserManagementRefactored: React.FC = () => {
         roleId = roleId[0]; // Take the first value if it's an array
       }
       
-      const resp = await userService.updateUser(user.id, {
+      // Prepare update payload
+      const updatePayload: any = {
         name: user.name,
         email: user.email,
         role_id: roleId,
         is_active: isActive,
         image_id: imageId
-      });
+      };
+      
+      // Include password if provided (admin can change user password directly)
+      if ((user as any).password && (user as any).password.trim()) {
+        updatePayload.password = (user as any).password;
+      }
+      
+      const resp = await userService.updateUser(user.id, updatePayload);
 
       if (resp) {
         toast.success('Cập nhật người dùng thành công');

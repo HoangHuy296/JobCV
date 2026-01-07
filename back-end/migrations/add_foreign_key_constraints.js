@@ -136,6 +136,13 @@ const foreignKeyConstraints = [
     query: `ALTER TABLE companies 
             ADD CONSTRAINT fk_companies_logo_id 
             FOREIGN KEY (logo_id) REFERENCES media(id) ON DELETE SET NULL`
+  },
+  // AI tables foreign keys
+  {
+    name: 'fk_ai_processes_prompt_id',
+    query: `ALTER TABLE ai_processes 
+            ADD CONSTRAINT fk_ai_processes_prompt_id 
+            FOREIGN KEY (prompt_id) REFERENCES ai_prompts(id) ON DELETE SET NULL`
   }
 ];
 

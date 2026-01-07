@@ -983,4 +983,12 @@ router.use('/cv-templates', cvTemplateRoutes);
 const cvSectionRoutes = require('./cvSections');
 router.use('/cv-sections', cvSectionRoutes);
 
+// AI routes
+const aiRoutes = require('./ai');
+router.use('/ai', aiRoutes);
+
+// API Keys routes
+const apiKeyRoutes = require('./apiKeys');
+router.use('/api-keys', apiKeyRoutes);
+
 module.exports = router;

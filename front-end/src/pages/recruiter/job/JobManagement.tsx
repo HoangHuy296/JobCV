@@ -671,19 +671,17 @@ const JobManagement: React.FC = () => {
 
   // Memoized pagination data
   const paginationData = useMemo(() => {
-    return pagination.totalPages > 1
-      ? {
-          currentPage,
-          totalPages: pagination.totalPages,
-          totalItems: pagination.total,
-          itemsPerPage: pagination.limit,
-          onPageChange: fetchJobs,
-          onItemsPerPageChange: (newLimit: number) => {
-            setPagination(prev => ({ ...prev, limit: newLimit }));
-            fetchJobs(1, false, newLimit);
-          }
-        }
-      : undefined;
+    return {
+      currentPage,
+      totalPages: pagination.totalPages,
+      totalItems: pagination.total,
+      itemsPerPage: pagination.limit,
+      onPageChange: fetchJobs,
+      onItemsPerPageChange: (newLimit: number) => {
+        setPagination(prev => ({ ...prev, limit: newLimit }));
+        fetchJobs(1, false, newLimit);
+      }
+    };
   }, [currentPage, pagination, fetchJobs]);
 
   // Memoized filter data

@@ -1,0 +1,53 @@
+Generate a professional and engaging company description.
+
+Company Information:
+Name: {{company_name}}
+Industry: {{industry}}
+Location: {{location}}
+Size: {{company_size}}
+Website: {{website}}
+Brief Info: {{brief_info}}
+
+Create a comprehensive company description that includes:
+- Company overview and mission
+- What makes the company unique
+- Company culture and values
+- Products/services offered
+- Growth and achievements
+- Why candidates should join
+
+Return a JSON object with:
+
+{
+  "short_description": "A compelling 2-3 sentence elevator pitch in Vietnamese (HTML format)",
+  "full_description": "A comprehensive 2-3 paragraph company description in Vietnamese (HTML format)",
+  "mission_statement": "Company mission statement (HTML format)",
+  "core_values": [
+    "Value 1",
+    "Value 2",
+    "Value 3"
+  ],
+  "culture_highlights": [
+    "Culture aspect 1",
+    "Culture aspect 2",
+    "Culture aspect 3"
+  ],
+  "why_join_us": [
+    "Reason 1",
+    "Reason 2",
+    "Reason 3"
+  ],
+  "keywords": ["keyword1", "keyword2", "keyword3"]
+}
+
+IMPORTANT HTML FORMATTING RULES:
+- Use ONLY these HTML tags: <p>, <ul>, <li>, <strong>, <em>
+- Use <p> for paragraphs
+- Use <ul> and <li> for bullet point lists
+- Use <strong> for bold text (important terms, company name)
+- Use <em> for italic text (emphasis)
+- Do NOT use any other HTML tags (no <h1>, <h2>, <div>, <span>, <br>, etc.)
+- Ensure all HTML is properly closed and valid
+- Apply HTML formatting to short_description, full_description, and mission_statement fields
+
+Make it professional, authentic, and attractive to potential candidates. Return ONLY valid JSON, no additional text.

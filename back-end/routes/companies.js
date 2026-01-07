@@ -11,11 +11,14 @@ const {
   subscribeToCompany,
   unsubscribeFromCompany,
   checkSubscriptionStatus,
-  getUserSubscribedCompanies
+  getUserSubscribedCompanies,
+  getTopCompanies,
+  generateCompanyDescription
 } = require('../controllers/CompanyController');
 
 // Public routes (no authentication required)
 router.get('/', getAllCompanies);
+router.get('/top', getTopCompanies);
 router.get('/my-company', authenticate, getMyCompany);
 router.get('/:id', getCompanyById);
 
@@ -29,5 +32,8 @@ router.delete('/:id', deleteCompany);
 router.post('/:companyId/subscribe', subscribeToCompany);
 router.post('/:companyId/unsubscribe', unsubscribeFromCompany);
 router.get('/:companyId/subscription-status', checkSubscriptionStatus);
+
+// AI-powered routes
+router.post('/ai/generate-description', generateCompanyDescription);
 
 module.exports = router;

@@ -29,8 +29,8 @@ interface DataManagementProps<T> {
   onRefresh: () => void;
   action?: {
     showAddAction?: boolean,
-    showEditAction?: boolean,
-    showDeleteAction?: boolean,
+    showEditAction?: boolean | ((record: T) => boolean),
+    showDeleteAction?: boolean | ((record: T) => boolean),
     additionalActions?: (record: T) => Action<T>[];
   }
   pagination?: {

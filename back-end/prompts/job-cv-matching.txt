@@ -1,0 +1,61 @@
+Analyze and score how well this CV matches the job requirements.
+
+Job Information:
+Title: {{job_title}}
+Requirements: {{job_requirements}}
+Benefits: {{job_benefits}}
+Years Experience Required: {{years_experienced}}
+Industry: {{industry}}
+Location: {{location}}
+
+Candidate CV Information:
+{{cv_data}}
+
+Perform a comprehensive matching analysis and return a JSON object with:
+
+{
+  "overall_score": 85,
+  "match_details": {
+    "skills_match": {
+      "score": 90,
+      "matched_skills": ["skill1", "skill2"],
+      "missing_skills": ["skill3"],
+      "explanation": "Detailed explanation of skills match"
+    },
+    "experience_match": {
+      "score": 80,
+      "years_of_experience": 5,
+      "relevant_experience": "Summary of relevant experience",
+      "explanation": "Detailed explanation"
+    },
+    "education_match": {
+      "score": 85,
+      "degree_level": "Bachelor",
+      "relevant_education": true,
+      "explanation": "Detailed explanation"
+    },
+    "location_match": {
+      "score": 100,
+      "candidate_location": "Location",
+      "willing_to_relocate": true
+    }
+  },
+  "strengths": [
+    "Strength 1",
+    "Strength 2",
+    "Strength 3"
+  ],
+  "weaknesses": [
+    "Weakness 1",
+    "Weakness 2"
+  ],
+  "recommendation": "hire|interview|reject",
+  "interview_questions": [
+    "Suggested question 1",
+    "Suggested question 2",
+    "Suggested question 3"
+  ],
+  "summary": "Brief summary of the candidate's fit for this position"
+}
+
+Be objective and thorough in your analysis. Return ONLY valid JSON, no additional text.

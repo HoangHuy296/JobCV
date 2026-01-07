@@ -74,7 +74,7 @@ const AdminCVTemplateManagement: React.FC = () => {
 
   const fetchAvailableSections = async () => {
     try {
-      const response = await getActiveSections();
+      const response = await getActiveSections();console.log(response.data)
       setAvailableSections(response.data || []);
     } catch (error) {
       console.error('Error fetching sections (mục):', error);
@@ -148,7 +148,7 @@ const AdminCVTemplateManagement: React.FC = () => {
           created_at: '',
           modified_at: ''
         },
-        position: typeof ts.position === 'string' ? JSON.parse(ts.position) : ts.position,
+        layout: typeof ts.layout === 'string' ? JSON.parse(ts.layout) : (ts.layout || { row: 0, column_width: 1, min_height: 150 }),
         is_visible: true,
         display_order: ts.display_order
       }));
@@ -201,7 +201,7 @@ const AdminCVTemplateManagement: React.FC = () => {
         for (const sectionData of newSections) {
           await addSectionToTemplate(editingTemplate.id, {
             section_id: sectionData.section.id,
-            position: sectionData.position,
+            layout: sectionData.layout,
             display_order: sectionData.display_order
           });
         }
@@ -209,7 +209,7 @@ const AdminCVTemplateManagement: React.FC = () => {
         // 3. Cập nhật mục hiện tại
         for (const sectionData of existingSections) {
           await updateTemplateSection(sectionData.id, {
-            position: sectionData.position,
+            layout: sectionData.layout,
             display_order: sectionData.display_order
           });
         }
@@ -232,7 +232,7 @@ const AdminCVTemplateManagement: React.FC = () => {
         for (const sectionData of templateSections) {
           await addSectionToTemplate(templateId, {
             section_id: sectionData.section.id,
-            position: sectionData.position,
+            layout: sectionData.layout,
             display_order: sectionData.display_order
           });
         }
@@ -434,7 +434,7 @@ const AdminCVTemplateManagement: React.FC = () => {
                     Mô tả
                   </label>
                   <textarea
-                    value={templateDescription}
+                    value={templateDescription || ''}
                     onChange={(e) => setTemplateDescription(e.target.value)}
                     placeholder="Mô tả chi tiết về template này..."
                     rows={4}

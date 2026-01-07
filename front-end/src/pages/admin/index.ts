@@ -12,6 +12,7 @@ export { default as UserManagement } from './system/UserManagement';
 export { default as SettingsManagement } from './system/SettingsManagement';
 export { default as MediaManagement } from './system/MediaManagement';
 export { default as NotificationManagement } from './system/NotificationManagement';
+export { default as AISettings } from './system/AISettings';
 
 // Export all admin components as a single module
 export * from './Dashboard';

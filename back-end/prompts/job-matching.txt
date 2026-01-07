@@ -1,0 +1,27 @@
+Analyze the candidate's CV and the job description to determine compatibility.
+
+CV Information:
+{cv_data}
+
+Job Description:
+{job_data}
+
+Evaluate the following aspects and provide a matching score (0-100):
+1. Skills match
+2. Experience level match
+3. Education requirements match
+4. Industry experience match
+
+Return ONLY a valid JSON object with this structure:
+{
+  "matchScore": 85,
+  "skillsMatch": 90,
+  "experienceMatch": 80,
+  "educationMatch": 85,
+  "industryMatch": 85,
+  "strengths": ["Strong technical skills", "Relevant experience"],
+  "gaps": ["Missing certification X"],
+  "recommendation": "Highly recommended candidate"
+}
+
+Important: Return ONLY the JSON object, no additional text or explanation.

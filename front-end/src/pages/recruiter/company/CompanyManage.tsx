@@ -8,9 +8,13 @@ import IndustrySelect from '../../../components/common/IndustrySelect';
 import LocationSelect from '../../../components/common/LocationSelect';
 import QuillEditor from '../../../components/common/QuillEditor';
 import CompanyDetail from '../../public/CompanyDetail';
+import AIGenerateButton from '../../../components/common/AIGenerateButton';
+import aiGenerationService from '../../../services/aiGenerationService';
+import { useIndustryContext } from '../../../contexts/IndustryContext';
 
 const CompanyManage: React.FC = () => {
   const { company, setCompany, companyLoading } = useUser();
+  const { industries } = useIndustryContext();
   const navigate = useNavigate();
   
   // Initialize form data with company data or empty values
@@ -111,6 +115,25 @@ const CompanyManage: React.FC = () => {
       });
     }
   }, [errors]);
+
+  const handleAIGenerate = async (customContext?: string) => {
+    const industryNames = Array.isArray(formData.industries) 
+      ? formData.industries.map((id: number) => 
+          industries.find(ind => ind.id === id)?.name || ''
+        ).filter(Boolean).join(', ')
+      : '';
+
+    return await aiGenerationService.generateCompanyDescription({
+      name: formData.name || '',
+      industry: industryNames,
+      size: formData.employees || '',
+      location: formData.location || ''
+    }, customContext);
+  };
+
+  const handleAIApply = (content: string) => {
+    setFormData(prev => ({ ...prev, description: content }));
+  };
   
   const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -402,6 +425,35 @@ const CompanyManage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="description">
                   Mô tả công ty <span className="text-red-500">*</span>
                 </label>
+                
+                {/* AI Helper Section */}
+                <div className="mb-3 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-1">
+                      <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-purple-900 mb-1">AI Assistant</h3>
+                      <p className="text-sm text-purple-700 mb-3">
+                        Sử dụng AI để tạo mô tả công ty chuyên nghiệp dựa trên tên và thông tin bạn đã nhập.
+                      </p>
+                      <AIGenerateButton
+                        label="Tạo mô tả với AI"
+                        onGenerate={handleAIGenerate}
+                        onApply={handleAIApply}
+                        disabled={false}
+                        size="sm"
+                        contextPlaceholder="Ví dụ: Nhấn mạnh văn hóa công ty trẻ trung, công nghệ hiện đại, cơ hội phát triển..."
+                      />
+                      <p className="text-xs text-purple-600 mt-2">
+                        💡 AI sẽ sử dụng mô tả hiện tại để cải thiện nội dung. Bạn có thể thêm yêu cầu cụ thể trong popup nếu cần.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
                 <QuillEditor
                   value={formData.description}
                   onChange={handleDescriptionChange}

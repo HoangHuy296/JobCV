@@ -15,7 +15,8 @@ const {
   checkLikeStatus,
   getJobPreview,
   getUserLikedJobs,
-  closeJob
+  closeJob,
+  generateJobDescription
 } = require('../controllers/JobController');
 
 // Import JobVersionController
@@ -65,5 +66,8 @@ router.put('/:jobId/versions/:versionId/primary', setPrimaryVersion);
 router.post('/:jobId/like', likeJob);
 router.post('/:jobId/unlike', unlikeJob);
 router.get('/:jobId/like-status', checkLikeStatus);
+
+// AI-powered routes
+router.post('/ai/generate-description', generateJobDescription);
 
 module.exports = router;

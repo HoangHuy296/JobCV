@@ -4,6 +4,9 @@ const path = require('path');
 const fs = require('fs').promises;
 const db = require('../config/db');
 const { generateCVPDF } = require('../utils/pdfGenerator');
+const { generateCVPDFFromHTML } = require('../utils/htmlToPdfGenerator');
+const geminiService = require('../utils/geminiService');
+const aiProcessService = require('../utils/aiProcessService');
 
 // Get all CVs for admin with pagination and filtering
 const getAllCVs = async (req, res) => {
@@ -52,6 +55,8 @@ const getAllCVs = async (req, res) => {
         const relativePath = uploadsIndex !== -1 ? cv.file_path.substring(uploadsIndex) : cv.file_path;
         cv.file_url = `${baseUrl}/${relativePath.replace(/\\/g, '/')}`;
       }
+      // Add is_template flag based on template_id
+      cv.is_template = cv.template_id ? true : false;
       return cv;
     });
     
@@ -253,6 +258,13 @@ const downloadCV = async (req, res) => {
     if (cv.template_id) {
       console.log('Generating PDF for template-based CV:', id);
       
+      // Get template info to get thumbnail URL
+      const [templates] = await db.query(
+        'SELECT thumbnail_url FROM cv_templates WHERE id = ?',
+        [cv.template_id]
+      );
+      const templateThumbnail = templates.length > 0 ? templates[0].thumbnail_url : null;
+      
       // Get section data for this CV
       const [sections] = await db.query(
         `SELECT 
@@ -278,17 +290,17 @@ const downloadCV = async (req, res) => {
         position: typeof section.position === 'string' ? JSON.parse(section.position) : section.position
       }));
       
-      // Generate PDF
-      const pdfDoc = generateCVPDF(cv, parsedSections);
+      // Generate PDF with HTML renderer to preserve background
+      const pdfBuffer = await generateCVPDFFromHTML(cv, parsedSections, templateThumbnail);
       
       // Set headers for PDF download
       const filename = `${cv.title.replace(/[^a-z0-9]/gi, '_')}.pdf`;
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBuffer.length);
       
-      // Pipe PDF to response
-      pdfDoc.pipe(res);
-      pdfDoc.end();
+      // Send PDF buffer
+      res.send(pdfBuffer);
       
       return;
     }
@@ -404,14 +416,10 @@ const deleteCV = async (req, res) => {
     // Soft delete the CV record
     await CV.delete(id);
     
-    // Update job applications to remove CV reference
+    // DO NOT remove CV reference from job_applications
+    // Recruiters need to see CV info even after user deletes it
+    // Just notify recruiters about the deletion
     if (applications.length > 0) {
-      await db.query(
-        'UPDATE job_applications SET cv_id = NULL WHERE cv_id = ? AND user_id = ?',
-        [id, userId]
-      );
-      
-      // Notify recruiters about CV deletion (WebSocket is automatically sent by Notification.create)
       const notifiedRecruiters = new Set();
       
       for (const app of applications) {
@@ -419,8 +427,8 @@ const deleteCV = async (req, res) => {
           await Notification.create({
             user_id: app.recruiter_id,
             title: 'Ứng viên đã xóa CV',
-            message: `${req.user.name} đã xóa CV được sử dụng trong đơn ứng tuyển cho công việc "${app.job_title}"`,
-            type: 'warning',
+            message: `${req.user.name} đã xóa CV được sử dụng trong đơn ứng tuyển cho công việc "${app.job_title}". CV vẫn có thể xem được từ hệ thống.`,
+            type: 'info',
             link: `/nha-tuyen-dung/quan-ly-tin-tuyen-dung`
           });
           
@@ -442,11 +450,232 @@ const deleteCV = async (req, res) => {
   }
 };
 
+// Extract CV information using Gemini AI
+const extractCVInfo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    
+    // Get CV and verify ownership
+    const cv = await CV.getByIdAndUserId(id, userId);
+    
+    if (!cv) {
+      return res.status(404).json({ 
+        result: null, 
+        message: 'Không tìm thấy CV' 
+      });
+    }
+
+    // Check if CV has a file (uploaded CV)
+    if (cv.file_path && cv.mime_type) {
+      // Extract from image/PDF file
+      const result = await geminiService.extractCVInfo(cv.file_path, cv.mime_type);
+      
+      if (result.success) {
+        return res.json({
+          result: result.data,
+          message: null
+        });
+      } else {
+        return res.status(500).json({
+          result: null,
+          message: `Không thể trích xuất thông tin: ${result.error}`
+        });
+      }
+    }
+    
+    // Check if CV is template-based
+    if (cv.template_id) {
+      // Get section data for this CV
+      const [sections] = await db.query(
+        `SELECT 
+          cvs.section_id,
+          cvs.data,
+          cvs.position,
+          cvs.is_visible,
+          cvs.display_order,
+          s.name as section_name,
+          s.key_name,
+          s.icon
+         FROM cv_user_sections cvs
+         LEFT JOIN cv_sections s ON cvs.section_id = s.id
+         WHERE cvs.cv_id = ?
+         ORDER BY cvs.display_order ASC`,
+        [id]
+      );
+      
+      // Parse JSON fields
+      const parsedSections = sections.map(section => ({
+        ...section,
+        data: typeof section.data === 'string' ? JSON.parse(section.data) : section.data,
+        position: typeof section.position === 'string' ? JSON.parse(section.position) : section.position
+      }));
+      
+      // Extract from sections
+      const result = await geminiService.extractFromCVSections(parsedSections);
+      
+      if (result.success) {
+        return res.json({
+          result: result.data,
+          message: null
+        });
+      } else {
+        return res.status(500).json({
+          result: null,
+          message: `Không thể trích xuất thông tin: ${result.error}`
+        });
+      }
+    }
+    
+    return res.status(400).json({
+      result: null,
+      message: 'CV không có dữ liệu để trích xuất'
+    });
+  } catch (error) {
+    console.error('Error extracting CV info:', error);
+    res.status(500).json({ 
+      result: null, 
+      message: 'Lỗi khi trích xuất thông tin CV' 
+    });
+  }
+};
+
+// AI-powered: Generate professional CV summary
+const generateCVSummary = async (req, res) => {
+  try {
+    const cvId = req.params.id;
+    const userId = req.user.id;
+
+    // Get CV data
+    const cv = await CV.findById(cvId);
+    if (!cv) {
+      return res.status(404).json({
+        success: false,
+        message: 'CV not found'
+      });
+    }
+
+    // Check ownership
+    if (cv.user_id !== userId && req.user.role?.name !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Check if AI process is available
+    const isAvailable = await aiProcessService.isProcessAvailable('CV_SUMMARY_GEN');
+    if (!isAvailable) {
+      return res.status(503).json({
+        success: false,
+        message: 'AI CV summary generator is not available'
+      });
+    }
+
+    // Prepare CV data
+    const cvData = JSON.stringify({
+      title: cv.title,
+      extracted_info: cv.extracted_info
+    });
+
+    // Execute AI process
+    const result = await aiProcessService.executeProcess(
+      'CV_SUMMARY_GEN',
+      { cv_data: cvData }
+    );
+
+    if (result.success) {
+      res.json({
+        success: true,
+        data: result.data
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: result.error || 'Failed to generate CV summary'
+      });
+    }
+  } catch (error) {
+    console.error('Error generating CV summary:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// AI-powered: Get CV improvement suggestions
+const getCVImprovementSuggestions = async (req, res) => {
+  try {
+    const cvId = req.params.id;
+    const userId = req.user.id;
+
+    // Get CV data
+    const cv = await CV.findById(cvId);
+    if (!cv) {
+      return res.status(404).json({
+        success: false,
+        message: 'CV not found'
+      });
+    }
+
+    // Check ownership
+    if (cv.user_id !== userId && req.user.role?.name !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Check if AI process is available
+    const isAvailable = await aiProcessService.isProcessAvailable('CV_IMPROVEMENT');
+    if (!isAvailable) {
+      return res.status(503).json({
+        success: false,
+        message: 'AI CV improvement analyzer is not available'
+      });
+    }
+
+    // Prepare CV data
+    const cvData = JSON.stringify({
+      title: cv.title,
+      extracted_info: cv.extracted_info
+    });
+
+    // Execute AI process
+    const result = await aiProcessService.executeProcess(
+      'CV_IMPROVEMENT',
+      { cv_data: cvData }
+    );
+
+    if (result.success) {
+      res.json({
+        success: true,
+        data: result.data
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: result.error || 'Failed to analyze CV'
+      });
+    }
+  } catch (error) {
+    console.error('Error analyzing CV:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   getAllCVs,
   getUserCVs,
   uploadCV,
   downloadCV,
   deleteCV,
-  checkCVInApplications
+  checkCVInApplications,
+  extractCVInfo,
+  generateCVSummary,
+  getCVImprovementSuggestions
 };

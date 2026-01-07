@@ -46,14 +46,6 @@ const Home: React.FC = () => {
     navigate(`/viec-lam?search=${searchKeyword}&location=${searchLocation}`);
   };
 
-  const formatSalary = (salary: string): string => {
-    if (!salary) return 'Thỏa thuận';
-    if (salary.includes('-')) {
-      const [min, max] = salary.split('-');
-      return `${parseInt(min).toLocaleString('vi-VN')} - ${parseInt(max).toLocaleString('vi-VN')} VNĐ`;
-    }
-    return `${parseInt(salary).toLocaleString('vi-VN')} VNĐ`;
-  };
 
   const formatDate = (dateString: string): string => {
     const diffDays = getDaysDifference(dateString, new Date().toISOString());
@@ -207,7 +199,7 @@ const Home: React.FC = () => {
                     </div>
                     <div className="flex items-center text-sm text-gray-600">
                       <LuDollarSign className="w-4 h-4 mr-2 text-gray-400" />
-                      <span className="font-semibold text-green-600">{formatSalary(job.salary)}</span>
+                      <span className="font-semibold text-green-600">{job.salary || 'Thỏa thuận'}</span>
                     </div>
                     <div className="flex items-center text-sm text-gray-600">
                       <LuClock className="w-4 h-4 mr-2 text-gray-400" />

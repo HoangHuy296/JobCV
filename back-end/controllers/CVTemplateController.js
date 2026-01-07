@@ -399,12 +399,12 @@ class CVTemplateController {
           
           if (sectionInfo) {
             await connection.query(
-              `INSERT INTO cv_user_sections (cv_id, section_id, position, data, is_visible, display_order)
+              `INSERT INTO cv_user_sections (cv_id, section_id, layout, data, is_visible, display_order)
                VALUES (?, ?, ?, ?, ?, ?)`,
               [
                 cvId,
                 sectionId,
-                JSON.stringify(sectionInfo.position || { x: 0, y: 0, width: 100, height: 20 }),
+                JSON.stringify(sectionInfo.layout || { row: 0, column_width: 1, min_height: 150 }),
                 JSON.stringify(sectionData),
                 sectionInfo.is_visible !== false,
                 sectionInfo.display_order || i
@@ -488,7 +488,7 @@ class CVTemplateController {
         `SELECT 
           cvs.section_id,
           cvs.data,
-          cvs.position,
+          cvs.layout,
           cvs.is_visible,
           cvs.display_order,
           s.name,
@@ -506,7 +506,7 @@ class CVTemplateController {
       const parsedSections = sections.map(section => ({
         ...section,
         data: typeof section.data === 'string' ? JSON.parse(section.data) : section.data,
-        position: typeof section.position === 'string' ? JSON.parse(section.position) : section.position,
+        layout: typeof section.layout === 'string' ? JSON.parse(section.layout) : section.layout,
         default_fields: typeof section.default_fields === 'string' ? JSON.parse(section.default_fields) : section.default_fields
       }));
       
@@ -564,7 +564,7 @@ class CVTemplateController {
         `SELECT 
           cvs.section_id,
           cvs.data,
-          cvs.position,
+          cvs.layout,
           cvs.is_visible,
           cvs.display_order,
           s.name,
@@ -582,7 +582,7 @@ class CVTemplateController {
       const parsedSections = sections.map(section => ({
         ...section,
         data: typeof section.data === 'string' ? JSON.parse(section.data) : section.data,
-        position: typeof section.position === 'string' ? JSON.parse(section.position) : section.position,
+        layout: typeof section.layout === 'string' ? JSON.parse(section.layout) : section.layout,
         default_fields: typeof section.default_fields === 'string' ? JSON.parse(section.default_fields) : section.default_fields
       }));
       
@@ -624,8 +624,8 @@ class CVTemplateController {
               z-index: 1;
             }
             .section {
-              position: absolute;
               padding: 10px;
+              margin-bottom: 10px;
             }
             .section-header {
               display: flex;
@@ -680,42 +680,37 @@ class CVTemplateController {
       
       // Add sections
       parsedSections.forEach(section => {
-        if (!section.is_visible) return;
-        
         const hasData = section.data && Object.keys(section.data).length > 0;
         if (!hasData) return;
         
-        const pos = section.position || { x: 0, y: 0, width: 100, height: 20 };
+        const layout = section.layout || { row: 0, column_width: 1, min_height: 150 };
         
         html += `
-          <div class="section" style="left: ${pos.x}%; top: ${pos.y}%; width: ${pos.width}%; min-height: ${pos.height}%;">
+          <div class="section" style="min-height: ${layout.min_height}px;">
             <div class="section-header">
-              <div class="section-title">${section.name}</div>
+              <h3 class="section-title">${section.name}</h3>
             </div>
         `;
         
-        // Add fields
-        if (section.default_fields && section.default_fields.fields) {
-          section.default_fields.fields.forEach(field => {
-            const value = section.data[field.id];
-            if (!value || value === '<p><br></p>') return;
-            
-            if (field.type === 'image') {
-              html += `
-                <div class="field">
-                  <img src="${value}" alt="${field.label}" class="field-image" />
-                </div>
-              `;
-            } else {
-              html += `
-                <div class="field">
-                  <div class="field-label">${field.label}</div>
-                  <div class="field-value">${value}</div>
-                </div>
-              `;
-            }
-          });
-        }
+        section.default_fields.fields.forEach(field => {
+          const value = section.data[field.id];
+          if (!value || value === '<p><br></p>') return;
+          
+          if (field.type === 'image') {
+            html += `
+              <div class="field">
+                <img src="${value}" alt="${field.label}" class="field-image" />
+              </div>
+            `;
+          } else {
+            html += `
+              <div class="field">
+                <div class="field-label">${field.label}</div>
+                <div class="field-value">${value}</div>
+              </div>
+            `;
+          }
+        });
         
         html += `</div>`;
       });
@@ -771,7 +766,7 @@ class CVTemplateController {
         `SELECT 
           cvs.section_id,
           cvs.data,
-          cvs.position,
+          cvs.layout,
           cvs.is_visible,
           cvs.display_order,
           s.name,
@@ -798,7 +793,7 @@ class CVTemplateController {
           default_fields: typeof section.default_fields === 'string' ? JSON.parse(section.default_fields) : section.default_fields,
           category: section.category
         },
-        position: typeof section.position === 'string' ? JSON.parse(section.position) : section.position,
+        layout: typeof section.layout === 'string' ? JSON.parse(section.layout) : section.layout,
         is_visible: section.is_visible,
         display_order: section.display_order,
         data: typeof section.data === 'string' ? JSON.parse(section.data) : section.data
@@ -875,9 +870,9 @@ class CVTemplateController {
         const sectionEntries = Object.entries(data);
         for (const [sectionId, sectionData] of sectionEntries) {
           if (sectionData && Object.keys(sectionData).length > 0) {
-            // Get section info for position
+            // Get section info for layout
             const [sectionInfo] = await connection.query(
-              `SELECT ts.position, ts.display_order
+              `SELECT ts.layout, ts.display_order
                FROM cv_template_sections ts
                WHERE ts.template_id = (SELECT template_id FROM cvs WHERE id = ?)
                AND ts.section_id = ?`,
@@ -886,12 +881,12 @@ class CVTemplateController {
             
             if (sectionInfo.length > 0) {
               await connection.query(
-                `INSERT INTO cv_user_sections (cv_id, section_id, position, data, is_visible, display_order)
+                `INSERT INTO cv_user_sections (cv_id, section_id, layout, data, is_visible, display_order)
                  VALUES (?, ?, ?, ?, ?, ?)`,
                 [
                   id,
                   sectionId,
-                  JSON.stringify(sectionInfo[0].position || { x: 0, y: 0, width: 100, height: 20 }),
+                  JSON.stringify(sectionInfo[0].layout || { row: 0, column_width: 1, min_height: 150 }),
                   JSON.stringify(sectionData),
                   true,
                   sectionInfo[0].display_order || 0

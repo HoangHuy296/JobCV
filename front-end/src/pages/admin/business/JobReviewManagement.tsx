@@ -366,7 +366,7 @@ const JobReviewManagement: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <LuDollarSign className="w-4 h-4 flex-shrink-0" />
-                        <span className="truncate">{job.salary}</span>
+                        <span className="truncate">{job.salary ?? 'Thoả thuận'}</span>
                       </div>
                     </div>
 

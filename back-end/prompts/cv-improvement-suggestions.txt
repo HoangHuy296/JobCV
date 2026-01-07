@@ -1,0 +1,56 @@
+Analyze this CV and provide actionable improvement suggestions.
+
+CV Information:
+{{cv_data}}
+
+Analyze the CV comprehensively and provide detailed feedback on:
+- Content quality and completeness
+- Structure and formatting
+- Skills presentation
+- Experience descriptions
+- Education section
+- Overall impact and professionalism
+
+Return a JSON object with:
+
+{
+  "overall_rating": 7.5,
+  "strengths": [
+    "Strength 1 with explanation",
+    "Strength 2 with explanation"
+  ],
+  "areas_for_improvement": [
+    {
+      "category": "Skills Section",
+      "issue": "Description of the issue",
+      "suggestion": "Specific actionable suggestion",
+      "priority": "high|medium|low",
+      "example": "Example of how to improve"
+    }
+  ],
+  "missing_sections": [
+    "Section name and why it's important"
+  ],
+  "formatting_suggestions": [
+    "Suggestion 1",
+    "Suggestion 2"
+  ],
+  "content_suggestions": {
+    "summary": "Suggestion for professional summary",
+    "experience": "How to better describe work experience",
+    "skills": "How to better present skills",
+    "education": "How to enhance education section"
+  },
+  "keyword_optimization": {
+    "current_keywords": ["keyword1", "keyword2"],
+    "suggested_keywords": ["keyword3", "keyword4"],
+    "explanation": "Why these keywords matter"
+  },
+  "ats_compatibility_score": 8.5,
+  "ats_tips": [
+    "Tip 1 for better ATS compatibility",
+    "Tip 2"
+  ]
+}
+
+Provide practical, actionable advice in Vietnamese. Return ONLY valid JSON, no additional text.

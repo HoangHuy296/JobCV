@@ -13,6 +13,7 @@ node_modules/
 # Production builds
 /build
 /dist
+/front-end/dist
 /.next
 /out
 
@@ -121,5 +122,8 @@ Thumbs.db
 !.vscode/extensions.json
 *.swp
 *.swo
+
+# Uploads
+/back-end/uploads/
 
 

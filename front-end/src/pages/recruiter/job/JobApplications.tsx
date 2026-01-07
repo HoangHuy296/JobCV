@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { LuArrowLeft, LuEye, LuDownload, LuCheck, LuX, LuClock, LuUser, LuMail, LuPhone, LuCalendar } from 'react-icons/lu';
+import { LuArrowLeft, LuEye, LuDownload, LuCheck, LuX, LuClock, LuUser, LuMail, LuPhone, LuCalendar, LuSparkles } from 'react-icons/lu';
 import { getJobById, type Job } from '../../../api/jobService';
 import { getJobApplications, updateApplicationStatus, type JobApplication } from '../../../api/jobApplicationService';
+import { extractCVInfo, type ExtractedCVInfo } from '../../../api/cvService';
 import { formatDate } from '../../../utils/dateUtils';
 import CVPreviewModal from '../../../components/cv/CVPreviewModal';
+import aiGenerationService from '../../../services/aiGenerationService';
 
 const JobApplications: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
@@ -19,6 +21,19 @@ const JobApplications: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCVPreviewModal, setShowCVPreviewModal] = useState(false);
   const [previewCvId, setPreviewCvId] = useState<number | null>(null);
+  const [extractingCvId, setExtractingCvId] = useState<number | null>(null);
+  const [extractedInfo, setExtractedInfo] = useState<Record<number, ExtractedCVInfo>>({});
+  
+  // CV Summary state
+  const [generatingSummaryId, setGeneratingSummaryId] = useState<number | null>(null);
+  const [cvSummaries, setCvSummaries] = useState<Record<number, string>>({});
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [selectedSummary, setSelectedSummary] = useState<string | null>(null);
+  
+  // Application Ranking state
+  const [isRanking, setIsRanking] = useState(false);
+  const [showRankingModal, setShowRankingModal] = useState(false);
+  const [rankingResult, setRankingResult] = useState<any>(null);
 
   const fetchJobAndApplications = useCallback(async () => {
     if (!jobId) return;
@@ -82,13 +97,72 @@ const JobApplications: React.FC = () => {
     }
   }, [fetchJobAndApplications]);
 
-  const handleViewCV = useCallback((cvId: number | null) => {
+  const handleViewCV = useCallback((cvId: number | null, cvDeleted?: boolean) => {
     if (!cvId) {
-      toast.warning('Ứng viên chưa đính kèm CV');
+      toast.warning('Không có CV để xem');
       return;
     }
+    // Allow viewing even if CV is deleted (soft delete)
     setPreviewCvId(cvId);
     setShowCVPreviewModal(true);
+  }, []);
+
+  const handleGenerateSummary = useCallback(async (cvId: number | null) => {
+    if (!cvId) {
+      toast.warning('Không có CV để tạo tóm tắt');
+      return;
+    }
+    
+    try {
+      setGeneratingSummaryId(cvId);
+      const summary = await aiGenerationService.generateCVSummary(cvId);
+      setCvSummaries(prev => ({ ...prev, [cvId]: summary }));
+      setSelectedSummary(summary);
+      setShowSummaryModal(true);
+      toast.success('Tạo tóm tắt CV thành công!');
+    } catch (error: any) {
+      toast.error(error.message || 'Không thể tạo tóm tắt CV');
+    } finally {
+      setGeneratingSummaryId(null);
+    }
+  }, []);
+
+  const handleRankApplications = useCallback(async () => {
+    if (!jobId || applications.length === 0) {
+      toast.warning('Không có ứng viên để xếp hạng');
+      return;
+    }
+    
+    try {
+      setIsRanking(true);
+      const result = await aiGenerationService.rankApplications(Number(jobId));
+      setRankingResult(result);
+      setShowRankingModal(true);
+      toast.success('Xếp hạng ứng viên thành công!');
+    } catch (error: any) {
+      toast.error(error.message || 'Không thể xếp hạng ứng viên');
+    } finally {
+      setIsRanking(false);
+    }
+  }, [jobId, applications.length]);
+
+  const handleExtractCVInfo = useCallback(async (cvId: number | null, cvDeleted?: boolean) => {
+    if (!cvId) {
+      toast.warning('Không có CV để trích xuất');
+      return;
+    }
+
+    try {
+      setExtractingCvId(cvId);
+      const info = await extractCVInfo(cvId);
+      setExtractedInfo(prev => ({ ...prev, [cvId]: info }));
+      toast.success('Đã trích xuất thông tin CV thành công');
+    } catch (error) {
+      console.error('Error extracting CV info:', error);
+      toast.error('Không thể trích xuất thông tin CV. Vui lòng kiểm tra cấu hình GEMINI_API_KEY');
+    } finally {
+      setExtractingCvId(null);
+    }
   }, []);
 
   const getStatusBadge = (status: string) => {
@@ -279,7 +353,35 @@ const JobApplications: React.FC = () => {
           />
         </div>
 
-        {/* Applications List */}
+        {/* Ranking Button */}
+      {applications.length > 0 && (
+        <div className="mb-6">
+          <button
+            onClick={handleRankApplications}
+            disabled={isRanking}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:from-orange-700 hover:to-red-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          >
+            {isRanking ? (
+              <>
+                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Đang xếp hạng...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Xếp hạng ứng viên bằng AI
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Applications List */}
         <div className="space-y-4">
           {filteredApplications.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
@@ -315,6 +417,12 @@ const JobApplications: React.FC = () => {
                         Ứng tuyển: {formatDate(application.applied_at)}
                       </span>
                       {getStatusBadge(application.status)}
+                      {application.cv_deleted && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border bg-orange-50 text-orange-700 border-orange-200">
+                          <LuX className="w-3 h-3" />
+                          CV đã bị xóa bởi ứng viên
+                        </span>
+                      )}
                     </div>
 
                     {application.cover_letter && (
@@ -323,15 +431,110 @@ const JobApplications: React.FC = () => {
                         <p className="text-sm text-gray-600">{application.cover_letter}</p>
                       </div>
                     )}
+
+                    {extractedInfo[application.cv_id!] && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <LuSparkles className="w-4 h-4 text-blue-600" />
+                          <p className="text-sm font-semibold text-blue-900">Thông tin trích xuất từ CV (AI)</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          {extractedInfo[application.cv_id!].phone && (
+                            <div>
+                              <span className="font-medium text-gray-700">SĐT:</span>
+                              <span className="ml-2 text-gray-600">{extractedInfo[application.cv_id!].phone}</span>
+                            </div>
+                          )}
+                          {extractedInfo[application.cv_id!].address && (
+                            <div>
+                              <span className="font-medium text-gray-700">Địa chỉ:</span>
+                              <span className="ml-2 text-gray-600">{extractedInfo[application.cv_id!].address}</span>
+                            </div>
+                          )}
+                          {extractedInfo[application.cv_id!].dateOfBirth && (
+                            <div>
+                              <span className="font-medium text-gray-700">Ngày sinh:</span>
+                              <span className="ml-2 text-gray-600">{extractedInfo[application.cv_id!].dateOfBirth}</span>
+                            </div>
+                          )}
+                          {extractedInfo[application.cv_id!].education && extractedInfo[application.cv_id!].education!.length > 0 && (
+                            <div className="col-span-2">
+                              <span className="font-medium text-gray-700">Học vấn:</span>
+                              <div className="ml-2 mt-1 space-y-1">
+                                {extractedInfo[application.cv_id!].education!.map((edu, idx) => (
+                                  <div key={idx} className="text-gray-600">
+                                    {edu.degree} - {edu.school} {edu.major && `(${edu.major})`}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {extractedInfo[application.cv_id!].skills && extractedInfo[application.cv_id!].skills!.length > 0 && (
+                            <div className="col-span-2">
+                              <span className="font-medium text-gray-700">Kỹ năng:</span>
+                              <div className="ml-2 mt-1 flex flex-wrap gap-1">
+                                {extractedInfo[application.cv_id!].skills!.map((skill, idx) => (
+                                  <span key={idx} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                                    {skill}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-2 ml-6">
                     <button
-                      onClick={() => handleViewCV(application.cv_id)}
-                      className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap"
+                      onClick={() => handleViewCV(application.cv_id, application.cv_deleted)}
+                      disabled={!application.cv_id}
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={application.cv_deleted ? 'CV đã bị xóa nhưng vẫn có thể xem' : 'Xem CV'}
                     >
                       <LuEye className="w-4 h-4" />
-                      Xem CV
+                      {application.cv_deleted ? 'Xem CV (đã xóa)' : 'Xem CV'}
+                    </button>
+
+                    <button
+                      onClick={() => handleExtractCVInfo(application.cv_id, application.cv_deleted)}
+                      disabled={extractingCvId === application.cv_id || !application.cv_id}
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={application.cv_deleted ? 'Trích xuất từ CV đã xóa' : 'Trích xuất thông tin bằng AI'}
+                    >
+                      {extractingCvId === application.cv_id ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Đang xử lý...
+                        </>
+                      ) : (
+                        <>
+                          <LuSparkles className="w-4 h-4" />
+                          {extractedInfo[application.cv_id!] ? 'Trích xuất lại' : 'Trích xuất AI'}
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => handleGenerateSummary(application.cv_id)}
+                      disabled={generatingSummaryId === application.cv_id || !application.cv_id}
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all text-sm font-medium whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+                      title="Tạo tóm tắt CV bằng AI"
+                    >
+                      {generatingSummaryId === application.cv_id ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Đang tạo...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          {cvSummaries[application.cv_id!] ? 'Xem tóm tắt' : 'Tóm tắt AI'}
+                        </>
+                      )}
                     </button>
 
                     {(() => {
@@ -396,6 +599,110 @@ const JobApplications: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Application Ranking Modal */}
+      {showRankingModal && rankingResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <svg className="w-6 h-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">Xếp hạng ứng viên bằng AI</h3>
+                  <p className="text-sm text-gray-500">{job?.title}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowRankingModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <LuX className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-4">
+                <div className="p-4 bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg">
+                  <h4 className="font-semibold text-orange-900 mb-2">🏆 Kết quả xếp hạng</h4>
+                  <pre className="whitespace-pre-wrap text-sm text-orange-800 font-mono leading-relaxed">
+                    {JSON.stringify(rankingResult, null, 2)}
+                  </pre>
+                </div>
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    💡 <strong>Gợi ý:</strong> AI đã phân tích và xếp hạng ứng viên dựa trên độ phù hợp với yêu cầu công việc. Sử dụng kết quả này để ưu tiên xem xét các ứng viên tiềm năng nhất.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => setShowRankingModal(false)}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CV Summary Modal */}
+      {showSummaryModal && selectedSummary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900">Tóm tắt CV bằng AI</h3>
+              </div>
+              <button
+                onClick={() => setShowSummaryModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <LuX className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-6 border border-purple-200">
+                <pre className="whitespace-pre-wrap text-gray-800 font-sans text-sm leading-relaxed">
+                  {selectedSummary}
+                </pre>
+              </div>
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  💡 <strong>Gợi ý:</strong> Tóm tắt này được tạo bởi AI dựa trên nội dung CV. Sử dụng để nhanh chóng đánh giá ứng viên.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => setShowSummaryModal(false)}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CV Preview Modal */}
       {previewCvId && (

@@ -40,6 +40,46 @@ class Setting {
       // Email template settings - Welcome
       { key: 'EMAIL_WELCOME_SUBJECT', group: 'EMAIL_TEMPLATE', value: 'Chào mừng đến với Job-CV! 🎉', description: 'Subject for welcome email' },
       { key: 'EMAIL_WELCOME_BODY', group: 'EMAIL_TEMPLATE', value: 'Cảm ơn bạn đã đăng ký tài khoản tại Job-CV Platform!', description: 'Body text for welcome email' },
+      
+      // AI settings
+      { key: 'GEMINI_API_KEY', group: 'AI', value: '', description: 'Google Gemini API Key for AI features' },
+      { key: 'GEMINI_MODEL', group: 'AI', value: 'gemini-1.5-flash', description: 'Gemini model to use (e.g., gemini-1.5-flash, gemini-1.5-pro)' },
+      { key: 'AI_CV_EXTRACTION_PROMPT', group: 'AI', value: `Analyze this CV/Resume image and extract the following information in JSON format. 
+If any field is not found, use null. Be precise and extract exactly what you see.
+
+Return ONLY a valid JSON object with this structure:
+{
+  "name": "Full name of the person",
+  "email": "Email address",
+  "phone": "Phone number",
+  "address": "Full address or location",
+  "dateOfBirth": "Date of birth (format: YYYY-MM-DD if possible)",
+  "education": [
+    {
+      "school": "School/University name",
+      "degree": "Degree or qualification",
+      "major": "Field of study/Major",
+      "startDate": "Start date",
+      "endDate": "End date or 'Present'",
+      "gpa": "GPA if mentioned"
+    }
+  ],
+  "experience": [
+    {
+      "company": "Company name",
+      "position": "Job title/position",
+      "startDate": "Start date",
+      "endDate": "End date or 'Present'",
+      "description": "Brief description of responsibilities"
+    }
+  ],
+  "skills": ["skill1", "skill2", "skill3"],
+  "languages": ["language1", "language2"],
+  "certifications": ["certification1", "certification2"],
+  "summary": "Professional summary or objective if present"
+}
+
+Important: Return ONLY the JSON object, no additional text or explanation.`, description: 'Prompt template for CV information extraction using AI' },
     ];
   }
 

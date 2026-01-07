@@ -7,6 +7,9 @@ import { DataManagement } from '../../../components';
 import { useIndustryContext } from '../../../contexts/IndustryContext';
 import SelectWithSearch from '../../../components/common/SelectWithSearch';
 import { getLogoUrl } from '../../../utils/mediaUtils';
+import AIGenerateButton from '../../../components/common/AIGenerateButton';
+import aiGenerationService from '../../../services/aiGenerationService';
+import QuillEditor from '../../../components/common/QuillEditor';
 
 const CompanyManagementRefactored: React.FC = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -14,11 +17,12 @@ const CompanyManagementRefactored: React.FC = () => {
   const { industries } = useIndustryContext();
   const hasFetchedData = useRef(false);
   const navigate = useNavigate();
+  const [currentFormData, setCurrentFormData] = useState<Record<string, any>>({});
   
   // Pagination and filtering state
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
-  const [industryFilter, setIndustryFilter] = useState('');
+  const [industryFilter, setIndustryFilter] = useState<string>('');
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -109,19 +113,17 @@ const CompanyManagementRefactored: React.FC = () => {
 
   // Memoized pagination data
   const paginationData = useMemo(() => {
-    return pagination.totalPages > 1
-      ? {
-          currentPage,
-          totalPages: pagination.totalPages,
-          totalItems: pagination.total,
-          itemsPerPage: pagination.limit,
-          onPageChange: fetchCompanies,
-          onItemsPerPageChange: (newLimit: number) => {
-            setPagination(prev => ({ ...prev, limit: newLimit }));
-            fetchCompanies(1, false, newLimit);
-          }
-        }
-      : undefined;
+    return {
+      currentPage,
+      totalPages: pagination.totalPages,
+      totalItems: pagination.total,
+      itemsPerPage: pagination.limit,
+      onPageChange: fetchCompanies,
+      onItemsPerPageChange: (newLimit: number) => {
+        setPagination(prev => ({ ...prev, limit: newLimit }));
+        fetchCompanies(1, false, newLimit);
+      }
+    };
   }, [currentPage, pagination, fetchCompanies]);
 
   // Memoized filter data
@@ -340,6 +342,22 @@ const CompanyManagementRefactored: React.FC = () => {
     }
   ], [industries]);
 
+  // AI Generation handlers
+  const handleAIGenerateDescription = async (customContext?: string) => {
+    const industryNames = Array.isArray(currentFormData.industries)
+      ? currentFormData.industries.map((id: number) =>
+          industries.find(ind => ind.id === id)?.name || ''
+        ).filter(Boolean).join(', ')
+      : '';
+
+    return await aiGenerationService.generateCompanyDescription({
+      name: currentFormData.name || '',
+      industry: industryNames,
+      size: currentFormData.employees || '',
+      location: currentFormData.location || ''
+    }, customContext);
+  };
+
   // Memoized form fields to prevent recreation on each render
   const formFields = useMemo(() => [
     { 
@@ -357,8 +375,47 @@ const CompanyManagementRefactored: React.FC = () => {
     { 
       name: 'description', 
       label: 'Mô tả', 
-      type: 'editor' as const, 
-      placeholder: 'Nhập mô tả công ty' 
+      type: 'custom' as const,
+      required: true,
+      render: (value: any, onChange: (value: any) => void) => {
+        return (
+          <div className="space-y-2">
+            {/* AI Helper Section */}
+            <div className="p-3 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                <span className="text-sm font-semibold text-purple-900">AI Assistant</span>
+              </div>
+              <AIGenerateButton
+                label="Tạo mô tả với AI"
+                onGenerate={handleAIGenerateDescription}
+                onApply={(content) => {
+                  onChange(content);
+                  setCurrentFormData({ ...currentFormData, description: content });
+                }}
+                disabled={false}
+                size="sm"
+                contextPlaceholder="Ví dụ: Nhấn mạnh văn hóa công ty trẻ trung, công nghệ hiện đại, cơ hội phát triển..."
+              />
+              <p className="text-xs text-purple-600 mt-2">
+                💡 AI sẽ sử dụng mô tả hiện tại để cải thiện nội dung. Bạn có thể thêm yêu cầu cụ thể trong popup nếu cần.
+              </p>
+            </div>
+            
+            {/* QuillEditor field */}
+            <QuillEditor
+              value={value || ''}
+              onChange={(newValue) => {
+                onChange(newValue);
+                setCurrentFormData({ ...currentFormData, description: newValue });
+              }}
+              placeholder="Nhập mô tả công ty"
+            />
+          </div>
+        );
+      }
     },
     { 
       name: 'industries', 
@@ -414,7 +471,7 @@ const CompanyManagementRefactored: React.FC = () => {
       type: 'text' as const, 
       placeholder: 'Nhập URL Instagram công ty' 
     },
-  ], [companies]);
+  ], [companies, currentFormData, industries]);
 
   return (
     <DataManagement<Company>

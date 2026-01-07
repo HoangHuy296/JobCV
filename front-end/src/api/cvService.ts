@@ -25,6 +25,33 @@ export interface CreateCVData {
   file?: File;
 }
 
+export interface ExtractedCVInfo {
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  dateOfBirth?: string | null;
+  education?: Array<{
+    school?: string;
+    degree?: string;
+    major?: string;
+    startDate?: string;
+    endDate?: string;
+    gpa?: string;
+  }>;
+  experience?: Array<{
+    company?: string;
+    position?: string;
+    startDate?: string;
+    endDate?: string;
+    description?: string;
+  }>;
+  skills?: string[];
+  languages?: string[];
+  certifications?: string[];
+  summary?: string | null;
+}
+
 // Get all CVs for the current user with pagination and filtering
 export const getUserCVs = async (
   page: number = 1,
@@ -113,6 +140,12 @@ export const getTemplateById = async (id: number): Promise<CV> => {
 export const createTemplateFromCV = async (cvId: number, title: string): Promise<number> => {
   const response = await api.post('/cvs/create-template', { cvId, title });
   return response.data.result.templateId;
+};
+
+// Extract CV information using Gemini AI
+export const extractCVInfo = async (cvId: number): Promise<ExtractedCVInfo> => {
+  const response = await api.post(`/cvs/${cvId}/extract`);
+  return response.data.result;
 };
 
 // DEPRECATED: Use cvTemplateService.createCVFromTemplate instead

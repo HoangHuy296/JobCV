@@ -234,7 +234,7 @@ const MyApplications: React.FC = () => {
                     <LuBriefcase className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
                     <div>
                       <h3 className="text-xl font-semibold text-gray-900 hover:text-blue-600 cursor-pointer">
-                        <a href={`/viec-lam/${app.job_id}`}>{app.job_title}</a>
+                        <a href={`/viec-lam/${btoa(app.job_id.toString())}`}>{app.job_title}</a>
                       </h3>
                       <div className="flex items-center gap-2 mt-1">
                         <LuBuilding2 className="w-4 h-4 text-gray-500" />

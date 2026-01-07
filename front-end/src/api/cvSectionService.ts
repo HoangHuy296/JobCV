@@ -26,11 +26,10 @@ export interface TemplateSection {
   id: number;
   template_id: number;
   section_id: number;
-  position: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
+  layout: {
+    row: number;
+    column_width: number;
+    min_height?: number;
   };
   custom_fields?: any;
   is_required: boolean;
@@ -47,11 +46,10 @@ export interface UserSection {
   id: number;
   cv_id: number;
   section_id: number;
-  position: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
+  layout: {
+    row: number;
+    column_width: number;
+    min_height?: number;
   };
   data: Record<string, any>;
   is_visible: boolean;
@@ -85,7 +83,7 @@ export const getUserCVSections = async (cvId: number) => {
 // Lưu section vào CV
 export const saveUserCVSection = async (cvId: number, data: {
   section_id: number;
-  position: { x: number; y: number; width: number; height: number };
+  layout: { row: number; column_width: number; min_height?: number };
   data: Record<string, any>;
   is_visible?: boolean;
   display_order?: number;
@@ -96,7 +94,7 @@ export const saveUserCVSection = async (cvId: number, data: {
 
 // Cập nhật user section
 export const updateUserCVSection = async (userSectionId: number, data: {
-  position?: { x: number; y: number; width: number; height: number };
+  layout?: { row: number; column_width: number; min_height?: number };
   data?: Record<string, any>;
   is_visible?: boolean;
   display_order?: number;
@@ -167,7 +165,7 @@ export const getTemplateSections = async (templateId: number) => {
 // Thêm section vào template
 export const addSectionToTemplate = async (templateId: number, data: {
   section_id: number;
-  position: { x: number; y: number; width: number; height: number };
+  layout: { row: number; column_width: number; min_height?: number };
   custom_fields?: any;
   is_required?: boolean;
   display_order?: number;
@@ -178,7 +176,7 @@ export const addSectionToTemplate = async (templateId: number, data: {
 
 // Cập nhật section trong template
 export const updateTemplateSection = async (templateSectionId: number, data: {
-  position?: { x: number; y: number; width: number; height: number };
+  layout?: { row: number; column_width: number; min_height?: number };
   custom_fields?: any;
   is_required?: boolean;
   display_order?: number;

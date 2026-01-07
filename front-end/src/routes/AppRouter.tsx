@@ -135,6 +135,7 @@ const AppRouter: React.FC = () => {
           <Route path="/admin/quan-ly-hinh-anh" element={<Admin.MediaManagement />} />
           <Route path="/admin/quan-ly-thong-bao" element={<Admin.NotificationManagement />} />
           <Route path="/admin/cai-dat" element={<Admin.SettingsManagement />} />
+          <Route path="/admin/cau-hinh-ai" element={<Admin.AISettings />} />
         </Route>
 
         {/* Catch-all route for undefined routes */}
