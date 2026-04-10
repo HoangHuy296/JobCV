@@ -270,7 +270,7 @@ const downloadCV = async (req, res) => {
         `SELECT 
           cvs.section_id,
           cvs.data,
-          cvs.position,
+          cvs.layout,
           cvs.is_visible,
           cvs.display_order,
           s.name as section_name,
@@ -287,7 +287,7 @@ const downloadCV = async (req, res) => {
       const parsedSections = sections.map(section => ({
         ...section,
         data: typeof section.data === 'string' ? JSON.parse(section.data) : section.data,
-        position: typeof section.position === 'string' ? JSON.parse(section.position) : section.position
+        layout: typeof section.layout === 'string' ? JSON.parse(section.layout) : section.layout
       }));
       
       // Generate PDF with HTML renderer to preserve background
@@ -455,34 +455,42 @@ const extractCVInfo = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
+    const userRole = req.user.role?.name;
     
-    // Get CV and verify ownership
-    const cv = await CV.getByIdAndUserId(id, userId);
+    console.log('🤖 [Gemini AI] Extract CV Info Request');
+    console.log('  - CV ID:', id);
+    console.log('  - User ID:', userId);
+    console.log('  - User Role:', userRole);
     
-    if (!cv) {
+    // Get CV (without user restriction first)
+    const [cvs] = await db.query(
+      'SELECT * FROM cvs WHERE id = ? AND deleted = FALSE',
+      [id]
+    );
+    
+    if (cvs.length === 0) {
+      console.log('  ❌ CV not found');
       return res.status(404).json({ 
         result: null, 
         message: 'Không tìm thấy CV' 
       });
     }
-
-    // Check if CV has a file (uploaded CV)
-    if (cv.file_path && cv.mime_type) {
-      // Extract from image/PDF file
-      const result = await geminiService.extractCVInfo(cv.file_path, cv.mime_type);
-      
-      if (result.success) {
-        return res.json({
-          result: result.data,
-          message: null
-        });
-      } else {
-        return res.status(500).json({
-          result: null,
-          message: `Không thể trích xuất thông tin: ${result.error}`
-        });
-      }
+    
+    const cv = cvs[0];
+    
+    // Check access: owner can access their CV, recruiter can access any CV
+    const isOwner = cv.user_id === userId;
+    const isRecruiter = userRole === 'recruiter' || userRole === 'admin';
+    
+    if (!isOwner && !isRecruiter) {
+      console.log('  ❌ Access denied - not owner and not recruiter');
+      return res.status(403).json({
+        result: null,
+        message: 'Bạn không có quyền truy cập CV này'
+      });
     }
+    
+    console.log('  ✅ Access granted -', isOwner ? 'Owner' : 'Recruiter');
     
     // Check if CV is template-based
     if (cv.template_id) {
@@ -491,7 +499,7 @@ const extractCVInfo = async (req, res) => {
         `SELECT 
           cvs.section_id,
           cvs.data,
-          cvs.position,
+          cvs.layout,
           cvs.is_visible,
           cvs.display_order,
           s.name as section_name,
@@ -508,11 +516,53 @@ const extractCVInfo = async (req, res) => {
       const parsedSections = sections.map(section => ({
         ...section,
         data: typeof section.data === 'string' ? JSON.parse(section.data) : section.data,
-        position: typeof section.position === 'string' ? JSON.parse(section.position) : section.position
+        layout: typeof section.layout === 'string' ? JSON.parse(section.layout) : section.layout
       }));
+      
+      console.log('🤖 [Gemini AI] Extracting CV info from sections...');
+      console.log('  - CV ID:', id);
+      console.log('  - Template ID:', cv.template_id);
+      console.log('  - Number of sections:', parsedSections.length);
+      console.log('  - Sections:', parsedSections.map(s => s.section_name || s.key_name).join(', '));
       
       // Extract from sections
       const result = await geminiService.extractFromCVSections(parsedSections);
+      
+      console.log('🤖 [Gemini AI] Extraction result:', result.success ? '✅ Success' : '❌ Failed');
+      if (!result.success) {
+        console.error('  - Error:', result.error);
+      } else {
+        console.log('  - Extracted data keys:', Object.keys(result.data || {}));
+      }
+      
+      if (result.success) {
+        return res.json({
+          result: result.data,
+          message: null
+        });
+      } else {
+        return res.status(500).json({
+          result: null,
+          message: `Không thể trích xuất thông tin: ${result.error}`
+        });
+      }
+    }
+    // Extract from image/PDF file
+    else if (cv.file_path && cv.mime_type) {
+      console.log('🤖 [Gemini AI] Extracting CV info from file...');
+      console.log('  - CV ID:', id);
+      console.log('  - File path:', cv.file_path);
+      console.log('  - MIME type:', cv.mime_type);
+      
+      // Extract from image/PDF file
+      const result = await geminiService.extractCVInfo(cv.file_path, cv.mime_type);
+      
+      console.log('🤖 [Gemini AI] Extraction result:', result.success ? '✅ Success' : '❌ Failed');
+      if (!result.success) {
+        console.error('  - Error:', result.error);
+      } else {
+        console.log('  - Extracted data keys:', Object.keys(result.data || {}));
+      }
       
       if (result.success) {
         return res.json({

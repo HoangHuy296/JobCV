@@ -107,8 +107,8 @@ const CVPreviewModal: React.FC<CVPreviewModalProps> = ({ isOpen, onClose, cvId }
             z-index: 1;
           }
           .section {
-            position: absolute;
             padding: 10px;
+            margin-bottom: 15px;
           }
           .section-header {
             display: flex;
@@ -165,10 +165,10 @@ const CVPreviewModal: React.FC<CVPreviewModalProps> = ({ isOpen, onClose, cvId }
       const hasData = section.data && Object.keys(section.data).length > 0;
       if (!hasData) return;
       
-      const pos = section.position || { x: 0, y: 0, width: 100, height: 20 };
+      const layout = section.layout || { row: 0, column_width: 1, min_height: 150 };
       
       html += `
-        <div class="section" style="left: ${pos.x}%; top: ${pos.y}%; width: ${pos.width}%; min-height: ${pos.height}%;">
+        <div class="section" style="min-height: ${layout.min_height}px;">
           <div class="section-header">
             <div class="section-title">${section.name}</div>
           </div>
@@ -297,17 +297,14 @@ const CVPreviewModal: React.FC<CVPreviewModalProps> = ({ isOpen, onClose, cvId }
                       const hasData = section.data && Object.keys(section.data).length > 0;
                       if (!hasData) return null;
                       
-                      const pos = section.position || { x: 0, y: 0, width: 100, height: 20 };
+                      const layout = section.layout || { row: 0, column_width: 1, min_height: 150 };
                       
                       return (
                         <div
                           key={index}
-                          className="absolute"
+                          className="mb-4"
                           style={{
-                            left: `${pos.x}%`,
-                            top: `${pos.y}%`,
-                            width: `${pos.width}%`,
-                            minHeight: `${pos.height}%`,
+                            minHeight: `${layout.min_height}px`,
                             padding: '10px'
                           }}
                         >

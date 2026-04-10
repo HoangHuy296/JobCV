@@ -103,17 +103,30 @@ const JobListing: React.FC = () => {
             
             // Check for negotiable salary
             if (selectedSalary === 'negotiable') {
-              return salaryStr.includes('thỏa thuận') || salaryStr.includes('thoả thuận') || salaryStr.includes('deal') || salaryStr.includes('协商');
+              // NULL, empty, or contains negotiable keywords
+              return !job.salary || 
+                     salaryStr.trim() === '' || 
+                     salaryStr.includes('thỏa thuận') || 
+                     salaryStr.includes('thoả thuận') || 
+                     salaryStr.includes('deal');
             }
             
-            // Extract numbers from salary string (e.g., "10-15 triệu", "Từ 20 triệu", "Trên 30 triệu")
-            const numbers = salaryStr.match(/\d+/g);
+            // Extract numbers from salary string (e.g., "10-15 triệu", "Từ 20 triệu", "18.500.000")
+            // Remove dots used as thousand separators first
+            const cleanedStr = salaryStr.replace(/\./g, '');
+            const numbers = cleanedStr.match(/\d+/g);
             if (!numbers || numbers.length === 0) {
-              return false; // No numbers found, exclude from filter
+              return false; // No numbers found, exclude from numeric range filters
             }
             
-            // Parse salary range
-            const salaryNumbers = numbers.map(n => parseInt(n));
+            // Parse salary range and convert to millions
+            const salaryNumbers = numbers.map(n => {
+              const num = parseInt(n);
+              // If number is >= 1,000,000, it's in VND, convert to millions
+              // Otherwise it's already in millions (e.g., "18" from "18 triệu")
+              return num >= 1000000 ? num / 1000000 : num;
+            });
+            
             let minSalary = Math.min(...salaryNumbers);
             let maxSalary = Math.max(...salaryNumbers);
             
@@ -123,17 +136,21 @@ const JobListing: React.FC = () => {
             }
             
             // Apply filter based on selected range
+            // Check if salary range overlaps with selected range
             switch (selectedSalary) {
               case 'under_10':
                 return maxSalary < 10;
               case '10_15':
-                return (minSalary >= 10 && minSalary < 15) || (maxSalary >= 10 && maxSalary <= 15) || (minSalary < 10 && maxSalary > 15);
+                // Salary range overlaps with 10-15 range
+                return !(maxSalary < 10 || minSalary > 15);
               case '15_20':
-                return (minSalary >= 15 && minSalary < 20) || (maxSalary >= 15 && maxSalary <= 20) || (minSalary < 15 && maxSalary > 20);
+                // Salary range overlaps with 15-20 range
+                return !(maxSalary < 15 || minSalary > 20);
               case '20_30':
-                return (minSalary >= 20 && minSalary < 30) || (maxSalary >= 20 && maxSalary <= 30) || (minSalary < 20 && maxSalary > 30);
+                // Salary range overlaps with 20-30 range
+                return !(maxSalary < 20 || minSalary > 30);
               case 'above_30':
-                return minSalary >= 30;
+                return minSalary > 30;
               default:
                 return true;
             }

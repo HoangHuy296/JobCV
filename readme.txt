@@ -74,6 +74,29 @@ Email: admin@cv.com
 Password: admin@@123
 
 ========================================
+BƯỚC 5: CẤU HÌNH EMAIL VÀ DOMAIN
+========================================
+
+1. Đăng nhập vào màn hình admin tại URL: http://localhost:5173/admin/dang-nhap
+   - Email: admin@cv.com
+   - Password: admin@@123
+
+2. Cấu hình email để gửi Gmail:
+   - Truy cập vào trang http://localhost:5173/admin/cai-dat
+   - Sau đó tiến hành đổi Setting sau:
+   EMAIL_USER=your_gmail_address@gmail.com
+   EMAIL_APP_PASSWORD=your_gmail_app_password
+   
+   Lưu ý: Cần tạo App Password tại Google Account Settings để sử dụng Gmail API
+
+3. Cấu hình domain frontend:
+   - Truy cập vào trang http://localhost:5173/admin/cai-dat
+   - Sau đó tiến hành đổi Setting sau:
+   FRONTEND_URL=http://localhost:5173
+   
+   Thay thế bằng domain thực tế của frontend khi triển khai
+
+========================================
 CÁC LỆNH HỮU ÍCH
 ========================================
 

@@ -2,6 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const fs = require('fs').promises;
 const path = require('path');
 const Setting = require('../models/Setting');
+const APIKey = require('../models/APIKey');
 const aiProcessService = require('./aiProcessService');
 
 class GeminiService {
@@ -9,28 +10,84 @@ class GeminiService {
     this.genAI = null;
     this.apiKey = null;
     this.model = null;
+    this.keyCache = null;
+    this.cacheExpiry = null;
   }
 
-  async initialize() {
-    // Try to get API key from database settings first
+  /**
+   * Get best available API key with caching
+   */
+  async getBestAPIKey() {
     try {
-      this.apiKey = await Setting.getValue('GEMINI_API_KEY', 'AI', process.env.GEMINI_API_KEY);
-      this.model = await Setting.getValue('GEMINI_MODEL', 'AI', 'gemini-1.5-flash');
+      // Check cache (valid for 60 seconds)
+      const now = Date.now();
+      if (this.keyCache && this.cacheExpiry && now < this.cacheExpiry) {
+        return this.keyCache;
+      }
+
+      // Get best available key from database
+      const apiKey = await APIKey.getBestAvailableKey('gemini');
       
-      if (!this.apiKey) {
-        console.warn('GEMINI_API_KEY not found in settings or environment variables');
+      if (!apiKey) {
+        console.warn('No active Gemini API key found in database');
+        // Fallback to settings or environment
+        const fallbackKey = await Setting.getValue('GEMINI_API_KEY', 'AI', process.env.GEMINI_API_KEY);
+        if (fallbackKey) {
+          return {
+            id: null,
+            api_key: fallbackKey,
+            provider: 'gemini'
+          };
+        }
+        return null;
+      }
+
+      // Cache the key for 60 seconds
+      this.keyCache = apiKey;
+      this.cacheExpiry = now + 60000;
+
+      return apiKey;
+    } catch (error) {
+      console.error('Error getting API key:', error);
+      // Fallback to environment variable
+      const fallbackKey = process.env.GEMINI_API_KEY;
+      if (fallbackKey) {
+        return {
+          id: null,
+          api_key: fallbackKey,
+          provider: 'gemini'
+        };
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Initialize Gemini AI with best available key
+   */
+  async initialize() {
+    try {
+      const apiKeyData = await this.getBestAPIKey();
+      
+      if (!apiKeyData || !apiKeyData.api_key) {
+        console.warn('No Gemini API key available');
         this.genAI = null;
-      } else {
-        this.genAI = new GoogleGenerativeAI(this.apiKey);
+        return;
+      }
+
+      this.apiKey = apiKeyData.api_key;
+      this.model = await Setting.getValue('GEMINI_MODEL', 'AI', 'gemini-1.5-flash');
+      this.genAI = new GoogleGenerativeAI(this.apiKey);
+      
+      // Increment usage counter if key has ID (from database)
+      if (apiKeyData.id) {
+        await APIKey.incrementUsage(apiKeyData.id).catch(err => {
+          console.error('Error incrementing key usage:', err);
+        });
       }
     } catch (error) {
-      console.error('Error initializing GeminiService from settings:', error);
-      // Fallback to environment variable
-      this.apiKey = process.env.GEMINI_API_KEY;
-      this.model = 'gemini-1.5-flash';
-      if (this.apiKey) {
-        this.genAI = new GoogleGenerativeAI(this.apiKey);
-      }
+      console.error('Error initializing GeminiService:', error);
+      this.genAI = null;
     }
   }
 
@@ -64,8 +121,12 @@ class GeminiService {
   }
 
   async extractFromCVSections(sections) {
+    // Re-initialize if needed
     if (!this.genAI) {
-      throw new Error('Gemini API key not configured');
+      await this.initialize();
+      if (!this.genAI) {
+        throw new Error('Gemini API key not configured');
+      }
     }
 
     try {

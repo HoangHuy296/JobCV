@@ -77,6 +77,7 @@ class APIKey {
       `, [today, provider, today]);
 
       // Get best available key
+      // MySQL doesn't support NULLS FIRST, use COALESCE to handle NULLs
       const [rows] = await db.query(`
         SELECT * FROM api_keys
         WHERE provider = ?
@@ -84,7 +85,7 @@ class APIKey {
           AND deleted_at IS NULL
           AND deleted = FALSE
           AND (daily_usage < daily_limit OR daily_limit = 0)
-        ORDER BY priority DESC, daily_usage ASC, last_used_at ASC NULLS FIRST
+        ORDER BY priority DESC, daily_usage ASC, COALESCE(last_used_at, '1970-01-01') ASC
         LIMIT 1
       `, [provider]);
 

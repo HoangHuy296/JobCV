@@ -159,7 +159,6 @@ const JobApplications: React.FC = () => {
       toast.success('Đã trích xuất thông tin CV thành công');
     } catch (error) {
       console.error('Error extracting CV info:', error);
-      toast.error('Không thể trích xuất thông tin CV. Vui lòng kiểm tra cấu hình GEMINI_API_KEY');
     } finally {
       setExtractingCvId(null);
     }
