@@ -126,4 +126,7 @@ Thumbs.db
 # Uploads
 /back-end/uploads/
 
+# Vercel
+.vercel
+
 
